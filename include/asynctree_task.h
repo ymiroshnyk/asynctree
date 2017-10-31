@@ -3,21 +3,21 @@
 #include "asynctree_config.h"
 #include "asynctree_task_callbacks.h"
 #include "asynctree_task_typedefs.h"
+#include "asynctree_access_key.h"
 
 namespace AST
 {
 
 class Service;
 class Mutex;
+class Task;
 
-class Task : public std::enable_shared_from_this<Task>
+class TaskImpl 
 {
 public:
-	// используется как в очереди, так и для детей. не бывает одновременно и там, и там
-	Task* next_;
-	// для worker очереди. указывает с каким весом запускать таск
+	// hooks and parameters for different queues in service, mutexes and tasks
+	TaskImpl* next_;
 	EnumTaskWeight weight_;
-	// для mutex
 	Mutex* mutex_;
 	bool shared_;
 
@@ -30,9 +30,10 @@ private:
 		S_Done,
 	};
 
+	Task& task_;
 	Service& service_;
 
-	Task* parent_;
+	TaskImpl* parent_;
 
 	TaskWorkFunc workFunc_;
 	TaskCallbacks callbacks_;
@@ -49,39 +50,53 @@ private:
 	struct WeightBuffer
 	{
 		// дети в буффере. они еще никогда не выполнялись и не добавлялись в очередь (их стейт S_Created)
-		Task* firstChild_;
-		Task* lastChild_;
+		TaskImpl* firstChild_;
+		TaskImpl* lastChild_;
 	};
 
 	WeightBuffer weightBuffers_[TW_Quantity];
 
-	TaskP selfLock_;
-
-	struct Private {};
 public:
-	Task(Private, Service& service, Task* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks);
-	~Task();
+	TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks);
+	~TaskImpl();
 
-	// Service-only interface
-	static TaskP create(Service& service, Task* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	Task* parent();
+	Task& task();
+	TaskImpl* parent();
 	void exec(EnumTaskWeight weight);
 	void destroy();
-	void addChildTask(EnumTaskWeight weight, Task& child);
+	void addChildTask(EnumTaskWeight weight, TaskImpl& child);
 	void notifyDeferredTask();
-	void addDeferredTask(EnumTaskWeight weight, Task& child);
+	void addDeferredTask(EnumTaskWeight weight, TaskImpl& child);
 
-	// public interface
 	void interrupt();
 	bool isInterrupted() const;
 
 private:
-	void _addChildTaskNoIncCounter(EnumTaskWeight weight, Task& child, std::unique_lock<std::mutex>& lock);
-	void interruptFromExec(std::unique_lock<std::mutex>& lock);
-	void interruptFromParent();
+	void _addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child, std::unique_lock<std::mutex>& lock);
+	void _interruptFromExec(std::unique_lock<std::mutex>& lock);
+	void _interruptFromParent();
 
-	void onFinished(std::unique_lock<std::mutex>& lock);
-	void notifyChildFinished();
+	void _onFinished(std::unique_lock<std::mutex>& lock);
+	void _notifyChildFinished();
+};
+
+class Task : public std::enable_shared_from_this<Task>
+{
+	friend class TaskImpl;
+
+	TaskImpl impl_;
+	TaskP selfLock_;
+
+	struct Private {};
+public:
+	Task(Private, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks);
+	~Task();
+
+	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
+	TaskImpl& _impl(AccessKey<Service, Mutex>);
+
+	void interrupt();
+	bool isInterrupted() const;
 };
 
 }

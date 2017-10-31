@@ -28,7 +28,7 @@ Service::Service(const uint numThreads)
 	const uint numWorkers = numThreads * TW_Quantity;
 
 	for (uint i = 0; i < numWorkers; ++i)
-		workers_.push_back(std::thread([&]() { workerFunc(); }));
+		workers_.push_back(std::thread([&]() { _workerFunc(); }));
 
 
 }
@@ -43,17 +43,17 @@ Service::~Service()
 
 	for (auto& queue : queues_)
 	{
-		for (Task* task = queue.firstInQueue_; task;)
+		for (TaskImpl* task = queue.firstInQueue_; task;)
 		{
-			Task* temp = task;
+			TaskImpl* temp = task;
 			task = task->next_;
 			temp->destroy();
 		}
 	}
 
-	for (Task* task = firstWorkerTask_; task;)
+	for (TaskImpl* task = firstWorkerTask_; task;)
 	{
-		Task* temp = task;
+		TaskImpl* temp = task;
 		task = task->next_;
 		temp->destroy();
 	}
@@ -61,8 +61,8 @@ Service::~Service()
 
 TaskP Service::startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
 {
-	auto task = Task::create(*this, nullptr, std::move(workFunc), std::move(callbacks));
-	addToQueue(weight, *task);
+	auto task = Task::_create(KEY, *this, nullptr, std::move(workFunc), std::move(callbacks));
+	_addToQueue(KEY, weight, task->_impl(KEY));
 	return std::move(task);
 }
 
@@ -81,14 +81,14 @@ TaskP Service::startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, Task
 	auto workerData = workerData_.get();
 	assert(workerData);
 
-	Task* parentTask = workerData->currentTask_;
+	TaskImpl* parentTask = workerData->currentTask_;
 
-	auto task = Task::create(*this, parentTask, std::move(workFunc), std::move(callbacks));
-	parentTask->addChildTask(weight, *task);
+	auto task = Task::_create(KEY, *this, parentTask, std::move(workFunc), std::move(callbacks));
+	parentTask->addChildTask(weight, task->_impl(KEY));
 	return std::move(task);
 }
 
-void Service::addToQueue(EnumTaskWeight weight, Task& task)
+void Service::_addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task)
 {
 	auto& queue = queues_[weight];
 
@@ -108,7 +108,7 @@ void Service::addToQueue(EnumTaskWeight weight, Task& task)
 		queue.firstInQueue_ = queue.lastInQueue_ = &task;
 	}
 
-	uint numToNotify = syncWorkersQueue();
+	uint numToNotify = _syncWorkersQueue();
 
 	lock.unlock();
 
@@ -116,7 +116,7 @@ void Service::addToQueue(EnumTaskWeight weight, Task& task)
 		workersCV_.notify_one();
 }
 
-void Service::setCurrentTask(Task* task)
+void Service::_setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task)
 {
 	assert(workerData_.get());
 	workerData_->currentTask_ = task;
@@ -125,7 +125,10 @@ void Service::setCurrentTask(Task* task)
 Task* Service::currentTask()
 {
 	if (auto workerData = workerData_.get())
-		return workerData->currentTask_;
+		if (auto taskImpl = workerData->currentTask_)
+		{
+			return &taskImpl->task();
+		}
 
 	return nullptr;
 }
@@ -138,7 +141,7 @@ void Service::waitUtilEverythingIsDone()
 		doneCV_.wait(lock);
 }
 
-uint Service::syncWorkersQueue()
+uint Service::_syncWorkersQueue()
 {
 	uint numToNotify = 0;
 
@@ -181,16 +184,16 @@ uint Service::syncWorkersQueue()
 			const float weightDeviat1 = currNormDeltaWeight0 + newNormDeltaWeight1;
 
 			if (weightDeviat0 <= weightDeviat1)
-				moveTaskToWorkers(weight0);
+				_moveTaskToWorkers(weight0);
 			else
-				moveTaskToWorkers(weight1);
+				_moveTaskToWorkers(weight1);
 		};
 
 		switch (activeTasksMask)
 		{
-		case 1: moveTaskToWorkers(TW_Light); break;
-		case 2: moveTaskToWorkers(TW_Middle); break;
-		case 4: moveTaskToWorkers(TW_Heavy); break;
+		case 1: _moveTaskToWorkers(TW_Light); break;
+		case 2: _moveTaskToWorkers(TW_Middle); break;
+		case 4: _moveTaskToWorkers(TW_Heavy); break;
 		case 7:
 		{
 			const float activeWorkersLight = (float)queues_[TW_Light].numActiveWorkers_;
@@ -212,16 +215,16 @@ uint Service::syncWorkersQueue()
 			if (sumWeightDeviatLight <= sumWeightDeviatMiddle)
 			{
 				if (sumWeightDeviatLight <= sumWeightDeviatHeavy)
-					moveTaskToWorkers(TW_Light);
+					_moveTaskToWorkers(TW_Light);
 				else
-					moveTaskToWorkers(TW_Heavy);
+					_moveTaskToWorkers(TW_Heavy);
 			}
 			else
 			{
 				if (sumWeightDeviatMiddle <= sumWeightDeviatHeavy)
-					moveTaskToWorkers(TW_Middle);
+					_moveTaskToWorkers(TW_Middle);
 				else
-					moveTaskToWorkers(TW_Heavy);
+					_moveTaskToWorkers(TW_Heavy);
 			}
 
 			break;
@@ -242,11 +245,11 @@ uint Service::syncWorkersQueue()
 	return numToNotify;
 }
 
-void Service::moveTaskToWorkers(EnumTaskWeight weight)
+void Service::_moveTaskToWorkers(EnumTaskWeight weight)
 {
 	auto& queue = queues_[weight];
 
-	Task* task = queue.firstInQueue_;
+	TaskImpl* task = queue.firstInQueue_;
 	assert(task);
 
 	queue.firstInQueue_ = task->next_;
@@ -279,7 +282,7 @@ void Service::moveTaskToWorkers(EnumTaskWeight weight)
 	++numWorkingTasks_;
 }
 
-void Service::workerFunc()
+void Service::_workerFunc()
 {
 	workerData_.reset(new WorkerData());
 
@@ -287,7 +290,7 @@ void Service::workerFunc()
 
 	while (!shuttingDown_)
 	{
-		int numToNotify = (int)syncWorkersQueue();
+		int numToNotify = (int)_syncWorkersQueue();
 
 		if (!firstWorkerTask_)
 		{
@@ -305,7 +308,7 @@ void Service::workerFunc()
 
 		if (firstWorkerTask_)
 		{
-			Task* task = firstWorkerTask_;
+			TaskImpl* task = firstWorkerTask_;
 			firstWorkerTask_ = task->next_;
 
 			if (!firstWorkerTask_)

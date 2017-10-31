@@ -3,11 +3,13 @@
 #include "asynctree_config.h"
 #include "asynctree_task_callbacks.h"
 #include "asynctree_task_typedefs.h"
+#include "asynctree_access_key.h"
 
 namespace AST
 {
 
-class Task;
+class Mutex;
+class TaskImpl;
 
 class Service : boost::noncopyable
 {
@@ -15,7 +17,7 @@ class Service : boost::noncopyable
 
 	struct WorkerData
 	{
-		Task* currentTask_;
+		TaskImpl* currentTask_;
 	};
 
 	struct WeightQueue
@@ -24,8 +26,8 @@ class Service : boost::noncopyable
 		uint overloadWorkersLimit_;
 		uint numActiveWorkers_;
 
-		Task* firstInQueue_;
-		Task* lastInQueue_;
+		TaskImpl* firstInQueue_;
+		TaskImpl* lastInQueue_;
 
 #ifdef _DEBUG
 		uint numTasksFinished_;
@@ -40,8 +42,8 @@ class Service : boost::noncopyable
 	std::vector<std::thread> workers_;
 	std::condition_variable workersCV_;
 
-	Task* firstWorkerTask_;
-	Task* lastWorkerTask_;
+	TaskImpl* firstWorkerTask_;
+	TaskImpl* lastWorkerTask_;
 	uint numWorkingTasks_;
 
 	bool shuttingDown_;
@@ -56,17 +58,16 @@ public:
 	TaskP startAutoTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
 	TaskP startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
 
-	void addToQueue(EnumTaskWeight weight, Task& task);
-	void setCurrentTask(Task* task);
-
+	void waitUtilEverythingIsDone();
 	Task* currentTask();
 
-	void waitUtilEverythingIsDone();
+	void _addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task);
+	void _setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task);
 
 private:
-	uint syncWorkersQueue();
-	void moveTaskToWorkers(EnumTaskWeight weight);
-	void workerFunc();
+	uint _syncWorkersQueue();
+	void _moveTaskToWorkers(EnumTaskWeight weight);
+	void _workerFunc();
 };
 
 }

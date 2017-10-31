@@ -59,13 +59,13 @@ TaskP Mutex::startSharedChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, 
 	return _startChildTask(true, parent, weight, std::move(workFunc), std::move(callbacks));
 }
 
-void Mutex::taskFinished()
+void Mutex::_taskFinished(AccessKey<TaskImpl>)
 {
 	std::unique_lock<std::mutex> lock(mutex_);
 
 	--numTasksToBeFinished_;
 
-	while (checkIfTaskCanBeStartedFromQueueAndStart()) {}
+	while (_checkIfTaskCanBeStartedFromQueueAndStart()) {}
 
 	lock.unlock();
 	destroyCV_.notify_one();
@@ -73,21 +73,22 @@ void Mutex::taskFinished()
 
 TaskP Mutex::_startTask(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
 {
-	auto task = Task::create(service_, nullptr, std::move(workFunc), std::move(callbacks));
-	task->shared_ = shared;
-	task->weight_ = weight;
-	task->mutex_ = this;
+	auto task = Task::_create(KEY, service_, nullptr, std::move(workFunc), std::move(callbacks));
+	auto& taskImpl = task->_impl(KEY);
+	taskImpl.shared_ = shared;
+	taskImpl.weight_ = weight;
+	taskImpl.mutex_ = this;
 
 	std::unique_lock<std::mutex> lock(mutex_);
 
-	if (checkIfTaskCanBeStartedAndIncCounters(shared))
+	if (_checkIfTaskCanBeStartedAndIncCounters(shared))
 	{
 		lock.unlock();
-		service_.addToQueue(weight, *task);
+		service_._addToQueue(KEY, weight, taskImpl);
 	}
 	else
 	{
-		queueTask(*task);
+		_queueTask(taskImpl);
 		lock.unlock();
 	}
 
@@ -104,29 +105,31 @@ TaskP Mutex::_startAutoTask(bool shared, EnumTaskWeight weight, TaskWorkFunc wor
 
 TaskP Mutex::_startChildTask(bool shared, Task* parent, EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
 {
-	auto task = Task::create(service_, parent, std::move(workFunc), std::move(callbacks));
-	task->shared_ = shared;
-	task->weight_ = weight;
-	task->mutex_ = this;
+	auto parentImpl = parent ? &parent->_impl(KEY) : nullptr;
+	auto task = Task::_create(KEY, service_, parentImpl, std::move(workFunc), std::move(callbacks));
+	auto& taskImpl = task->_impl(KEY);
+	taskImpl.shared_ = shared;
+	taskImpl.weight_ = weight;
+	taskImpl.mutex_ = this;
 
 	std::unique_lock<std::mutex> lock(mutex_);
 
-	if (checkIfTaskCanBeStartedAndIncCounters(shared))
+	if (_checkIfTaskCanBeStartedAndIncCounters(shared))
 	{
 		lock.unlock();
-		parent->addChildTask(weight, *task);
+		parentImpl->addChildTask(weight, taskImpl);
 	}
 	else
 	{
-		parent->notifyDeferredTask();
-		queueTask(*task);
+		parentImpl->notifyDeferredTask();
+		_queueTask(taskImpl);
 		lock.unlock();
 	}
 
 	return std::move(task);
 }
 
-bool Mutex::checkIfTaskCanBeStartedAndIncCounters(bool shared)
+bool Mutex::_checkIfTaskCanBeStartedAndIncCounters(bool shared)
 {
 	if (numTasksToBeFinished_ == 0 || (shared && sharedTasksInProgress_ && !firstQueuedChild_))
 	{
@@ -138,7 +141,7 @@ bool Mutex::checkIfTaskCanBeStartedAndIncCounters(bool shared)
 	return false;
 }
 
-void Mutex::queueTask(Task& task)
+void Mutex::_queueTask(TaskImpl& task)
 {
 	if (lastQueuedChild_)
 	{
@@ -155,11 +158,11 @@ void Mutex::queueTask(Task& task)
 	}
 }
 
-bool Mutex::checkIfTaskCanBeStartedFromQueueAndStart()
+bool Mutex::_checkIfTaskCanBeStartedFromQueueAndStart()
 {
 	if (firstQueuedChild_)
 	{
-		Task* task = firstQueuedChild_;
+		TaskImpl* task = firstQueuedChild_;
 
 		if (numTasksToBeFinished_ == 0 || (task->shared_ && sharedTasksInProgress_))
 		{
@@ -172,10 +175,10 @@ bool Mutex::checkIfTaskCanBeStartedFromQueueAndStart()
 
 			++numTasksToBeFinished_;
 
-			if (Task* parent = task->parent())
+			if (TaskImpl* parent = task->parent())
 				parent->addDeferredTask(task->weight_, *task);
 			else
-				service_.addToQueue(task->weight_, *task);
+				service_._addToQueue(KEY, task->weight_, *task);
 
 			return true;
 		}

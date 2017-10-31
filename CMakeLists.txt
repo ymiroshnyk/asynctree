@@ -7,6 +7,7 @@ add_definitions(-DBOOST_ALL_NO_LIB)
 
 set(HEADERS
 	${CMAKE_CURRENT_LIST_DIR}/include/asynctree.h
+	${CMAKE_CURRENT_LIST_DIR}/include/asynctree_access_key.h
 	${CMAKE_CURRENT_LIST_DIR}/include/asynctree_config.h
 	${CMAKE_CURRENT_LIST_DIR}/include/asynctree_mutex.h
 	${CMAKE_CURRENT_LIST_DIR}/include/asynctree_qt_connector.h

@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
 {
 	QApplication a(argc, argv);
 
-	// Task parented to the application so that it
+	// TaskImpl parented to the application so that it
 	// will be deleted by the application.
 	MainWindow *window = new MainWindow();
 	window->showMaximized();
