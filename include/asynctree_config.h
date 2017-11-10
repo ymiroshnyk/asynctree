@@ -10,6 +10,7 @@
 #include <memory>
 #include <functional>
 #include <cassert>
+#include <cmath>
 
 namespace AST
 {

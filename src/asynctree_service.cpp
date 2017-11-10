@@ -174,11 +174,11 @@ uint Service::_syncWorkersQueue()
 		auto selectAndMoveTask = [&](float limits0, float limits1, float activeWorkers0, float activeWorkers1,
 			EnumTaskWeight weight0, EnumTaskWeight weight1)
 		{
-			const float currNormDeltaWeight0 = fabs(1.f - activeWorkers0 / limits0);
-			const float currNormDeltaWeight1 = fabs(1.f - activeWorkers1 / limits1);
+			const float currNormDeltaWeight0 = std::fabs(1.f - activeWorkers0 / limits0);
+			const float currNormDeltaWeight1 = std::fabs(1.f - activeWorkers1 / limits1);
 
-			const float newNormDeltaWeight0 = fabs(1.f - activeWorkers0 / limits0);
-			const float newNormDeltaWeight1 = fabs(1.f - activeWorkers1 / limits1);
+			const float newNormDeltaWeight0 = std::fabs(1.f - activeWorkers0 / limits0);
+			const float newNormDeltaWeight1 = std::fabs(1.f - activeWorkers1 / limits1);
 
 			const float weightDeviat0 = newNormDeltaWeight0 + currNormDeltaWeight1;
 			const float weightDeviat1 = currNormDeltaWeight0 + newNormDeltaWeight1;
