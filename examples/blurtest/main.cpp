@@ -1,17 +1,9 @@
 #include <iostream>
-#include <memory>
-#include <functional>
-#include <cmath>
-#include <boost/noncopyable.hpp>
-#include <cassert>
-#include <chrono>
-#include <thread>
 
+#include <QApplication>
 #include <QPainter>
-#include <QtGui>
 
 #include "main.h"
-#include <cmath>
 
 AST::Service service;
 

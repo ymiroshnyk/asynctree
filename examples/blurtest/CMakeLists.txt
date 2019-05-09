@@ -1,43 +1,42 @@
 # This file builds example
 
-include(${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt)
-
 cmake_minimum_required (VERSION 2.6)
-project (asynctree-blurtest)
+project (blurtest)
 
-find_package(Boost REQUIRED)
-add_definitions(-DBOOST_ALL_NO_LIB)
+# boost >>
+find_package(Boost REQUIRED COMPONENTS chrono)
+# << boost
 
-#Qt
-find_package(Qt4 REQUIRED QtCore QtGui)
+# Qt >>
+find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+set(CMAKE_AUTOMOC ON)
+# << Qt
 
-qt4_wrap_cpp(HEADERS_MOC ${CMAKE_CURRENT_LIST_DIR}/main.h)
-#qt4_wrap_ui(HEADERS_UI )
-#qt4_add_resources(QT_ADDED_RESOURCES )
+file(GLOB_RECURSE COMPILABLE_FILES CONFIGURE_DEPENDS *.cpp *.h *.hpp)
 
-include(${QT_USE_FILE})
-add_definitions(${QT_DEFINITIONS})
+add_executable(${PROJECT_NAME} 
+	${COMPILABLE_FILES}
+)
 
-set(SOURCES 
-	${CMAKE_CURRENT_LIST_DIR}/main.h
-	${CMAKE_CURRENT_LIST_DIR}/main.cpp
-	${HEADERS_MOC}
-	${HEADERS_UI}
-	${QT_ADDED_RESOURCES}
-	)
-set(HEADERS
-	)
-
-#for generated files by qt wrappers
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-	
-add_executable(asynctree-blurtest ${SOURCES} ${HEADERS})
-target_include_directories(asynctree-blurtest
+target_include_directories(${PROJECT_NAME}
 	PRIVATE
-	${Boost_INCLUDE_DIRS} 
-	)
-target_link_libraries(asynctree-blurtest
-	asynctree 
-	${Boost_LIBRARIES}
-	${QT_LIBRARIES})
+	PUBLIC
+)
 
+target_link_libraries(${PROJECT_NAME}
+	PRIVATE
+	asynctree 
+	Boost::chrono
+	Qt5::Widgets
+)
+
+# Copy Qt5 dll in the binaries directory
+if(MSVC)
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+			$<TARGET_FILE:Qt5::Core> 
+			$<TARGET_FILE:Qt5::Gui> 
+			$<TARGET_FILE:Qt5::Widgets>
+			$<TARGET_FILE_DIR:${PROJECT_NAME}>
+	)
+endif()
