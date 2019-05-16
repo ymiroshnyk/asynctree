@@ -20,7 +20,7 @@ Service::Service(const uint numThreads)
 		queue.lastInQueue_ = nullptr;
 		queue.numActiveWorkers_ = 0;
 
-#ifdef _DEBUG
+#ifdef ASYNCTREE_DEBUG
 		queue.numTasksFinished_ = 0;
 #endif
 	}
@@ -156,7 +156,7 @@ uint Service::_syncWorkersQueue()
 				activeTasksMask |= queue.mask_;
 		}
 
-#ifdef _DEBUG
+#ifdef ASYNCTREE_DEBUG
 		static uint maskCounter[8] = { 0 };
 
 		++maskCounter[activeTasksMask];
@@ -330,7 +330,7 @@ void Service::_workerFunc()
 			assert(numWorkingTasks_ != (uint)-1);
 			--queues_[weight].numActiveWorkers_;
 			assert(queues_[weight].numActiveWorkers_ != (uint)-1);
-#ifdef _DEBUG
+#ifdef ASYNCTREE_DEBUG
 			++queues_[weight].numTasksFinished_;
 #endif
 		}

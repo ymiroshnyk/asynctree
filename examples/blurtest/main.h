@@ -29,7 +29,7 @@ class MainWindow : public QWidget
 
 	AST::TaskW work_;
 
-#ifdef _DEBUG
+#ifdef ASYNCTREE_DEBUG
 	static const uint blurSize = 100;
 #else
 	static const uint blurSize = 1000;

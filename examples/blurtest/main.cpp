@@ -14,7 +14,10 @@ MainWindow::MainWindow(QWidget* parent)
 , needsUpdate_(false)
 {
 	original_ = QImage("image.png");
-	original_.convertToFormat(QImage::Format_RGB888);
+	if (original_.format() != QImage::Format_RGB888)
+	{
+		original_ = original_.convertToFormat(QImage::Format_RGB888);
+	}
 
 	setAutoFillBackground(false);
 

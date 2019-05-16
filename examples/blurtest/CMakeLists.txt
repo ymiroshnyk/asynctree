@@ -18,6 +18,11 @@ add_executable(${PROJECT_NAME}
 	${COMPILABLE_FILES}
 )
 
+set_target_properties(${PROJECT_NAME}
+	PROPERTIES
+	CXX_STANDARD 14
+)
+
 target_include_directories(${PROJECT_NAME}
 	PRIVATE
 	PUBLIC

@@ -29,7 +29,7 @@ class Service : boost::noncopyable
 		TaskImpl* firstInQueue_;
 		TaskImpl* lastInQueue_;
 
-#ifdef _DEBUG
+#ifdef ASYNCTREE_DEBUG
 		uint numTasksFinished_;
 #endif
 	};

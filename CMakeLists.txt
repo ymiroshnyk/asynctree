@@ -15,6 +15,11 @@ add_library(${PROJECT_NAME} STATIC
 	${COMPILABLE_FILES}
 )
 
+target_compile_definitions(${PROJECT_NAME}
+	PUBLIC
+	$<$<CONFIG:Debug>:ASYNCTREE_DEBUG>
+)
+
 set_target_properties(${PROJECT_NAME} 
 	PROPERTIES 
 	CXX_STANDARD 11
