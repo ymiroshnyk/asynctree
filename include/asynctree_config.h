@@ -12,7 +12,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace AST
+namespace ast
 {
 
 typedef unsigned int uint;
@@ -21,9 +21,9 @@ typedef std::function<void()> TaskWorkFunc;
 
 enum EnumTaskWeight
 {
-	TW_Light = 0,
-	TW_Middle,
-	TW_Heavy,
+	Light = 0,
+	Middle,
+	Heavy,
 
 	TW_Quantity
 };

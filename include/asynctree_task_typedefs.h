@@ -1,6 +1,6 @@
 #pragma once
 
-namespace AST
+namespace ast
 {
 
 typedef std::shared_ptr<class Task> TaskP;

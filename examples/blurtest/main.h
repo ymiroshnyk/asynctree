@@ -16,7 +16,7 @@ class MainWindow : public QWidget
 {
 	Q_OBJECT
 
-	AST::ScopedQtConnector connector_;
+	ast::ScopedQtConnector connector_;
 
 	enum EnumState
 	{
@@ -27,7 +27,7 @@ class MainWindow : public QWidget
 
 	std::atomic<EnumState> state_;
 
-	AST::TaskW work_;
+	ast::TaskW work_;
 
 #ifdef ASYNCTREE_DEBUG
 	static const uint blurSize = 100;
@@ -55,7 +55,7 @@ public:
 private:
 	void initTarget();
 	void blurPixel(uint x, uint y, bool hor);
-	void blurRect(AST::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
+	void blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
 
 public slots :
 	

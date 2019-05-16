@@ -2,7 +2,7 @@
 #include "asynctree_task.h"
 #include "asynctree_service.h"
 
-namespace AST
+namespace ast
 {
 
 Mutex::Mutex(Service& service)

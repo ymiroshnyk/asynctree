@@ -1,7 +1,7 @@
 #include "asynctree_service.h"
 #include "asynctree_task.h"
 
-namespace AST
+namespace ast
 {
 
 Service::Service(const uint numThreads)
@@ -59,21 +59,21 @@ Service::~Service()
 	}
 }
 
-TaskP Service::startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
+TaskP Service::startTopmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
 {
 	auto task = Task::_create(KEY, *this, nullptr, std::move(workFunc), std::move(callbacks));
 	_addToQueue(KEY, weight, task->_impl(KEY));
 	return std::move(task);
 }
 
-TaskP Service::startAutoTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
+TaskP Service::startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
 {
 	auto workerData = workerData_.get();
 
 	if (workerData && workerData->currentTask_)
 		return startChildTask(weight, std::move(workFunc), std::move(callbacks));
 	else
-		return startTask(weight, std::move(workFunc), std::move(callbacks));
+		return startTopmostTask(weight, std::move(workFunc), std::move(callbacks));
 }
 
 TaskP Service::startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
@@ -167,9 +167,9 @@ uint Service::_syncWorkersQueue()
 			break;
 		}
 
-		static float limitsLight = (float)queues_[TW_Light].overloadWorkersLimit_;
-		static float limitsMiddle = (float)queues_[TW_Middle].overloadWorkersLimit_;
-		static float limitsHeavy = (float)queues_[TW_Heavy].overloadWorkersLimit_;
+		static float limitsLight = (float)queues_[Light].overloadWorkersLimit_;
+		static float limitsMiddle = (float)queues_[Middle].overloadWorkersLimit_;
+		static float limitsHeavy = (float)queues_[Heavy].overloadWorkersLimit_;
 
 		auto selectAndMoveTask = [&](float limits0, float limits1, float activeWorkers0, float activeWorkers1,
 			EnumTaskWeight weight0, EnumTaskWeight weight1)
@@ -191,14 +191,14 @@ uint Service::_syncWorkersQueue()
 
 		switch (activeTasksMask)
 		{
-		case 1: _moveTaskToWorkers(TW_Light); break;
-		case 2: _moveTaskToWorkers(TW_Middle); break;
-		case 4: _moveTaskToWorkers(TW_Heavy); break;
+		case 1: _moveTaskToWorkers(Light); break;
+		case 2: _moveTaskToWorkers(Middle); break;
+		case 4: _moveTaskToWorkers(Heavy); break;
 		case 7:
 		{
-			const float activeWorkersLight = (float)queues_[TW_Light].numActiveWorkers_;
-			const float activeWorkersMiddle = (float)queues_[TW_Middle].numActiveWorkers_;
-			const float activeWorkersHeavy = (float)queues_[TW_Heavy].numActiveWorkers_;
+			const float activeWorkersLight = (float)queues_[Light].numActiveWorkers_;
+			const float activeWorkersMiddle = (float)queues_[Middle].numActiveWorkers_;
+			const float activeWorkersHeavy = (float)queues_[Heavy].numActiveWorkers_;
 
 			const float currNormDeltaWeightLight = fabs(1.f - activeWorkersLight / limitsLight);
 			const float currNormDeltaWeightMiddle = fabs(1.f - activeWorkersMiddle / limitsMiddle);
@@ -215,28 +215,28 @@ uint Service::_syncWorkersQueue()
 			if (sumWeightDeviatLight <= sumWeightDeviatMiddle)
 			{
 				if (sumWeightDeviatLight <= sumWeightDeviatHeavy)
-					_moveTaskToWorkers(TW_Light);
+					_moveTaskToWorkers(Light);
 				else
-					_moveTaskToWorkers(TW_Heavy);
+					_moveTaskToWorkers(Heavy);
 			}
 			else
 			{
 				if (sumWeightDeviatMiddle <= sumWeightDeviatHeavy)
-					_moveTaskToWorkers(TW_Middle);
+					_moveTaskToWorkers(Middle);
 				else
-					_moveTaskToWorkers(TW_Heavy);
+					_moveTaskToWorkers(Heavy);
 			}
 
 			break;
 		}
-		case 3: selectAndMoveTask(limitsLight, limitsMiddle, (float)queues_[TW_Light].numActiveWorkers_,
-			(float)queues_[TW_Middle].numActiveWorkers_, TW_Light, TW_Middle); break;
+		case 3: selectAndMoveTask(limitsLight, limitsMiddle, (float)queues_[Light].numActiveWorkers_,
+			(float)queues_[Middle].numActiveWorkers_, Light, Middle); break;
 
-		case 5: selectAndMoveTask(limitsLight, limitsHeavy, (float)queues_[TW_Light].numActiveWorkers_,
-			(float)queues_[TW_Heavy].numActiveWorkers_, TW_Light, TW_Heavy); break;
+		case 5: selectAndMoveTask(limitsLight, limitsHeavy, (float)queues_[Light].numActiveWorkers_,
+			(float)queues_[Heavy].numActiveWorkers_, Light, Heavy); break;
 
-		case 6: selectAndMoveTask(limitsMiddle, limitsHeavy, (float)queues_[TW_Middle].numActiveWorkers_,
-			(float)queues_[TW_Heavy].numActiveWorkers_, TW_Middle, TW_Heavy); break;
+		case 6: selectAndMoveTask(limitsMiddle, limitsHeavy, (float)queues_[Middle].numActiveWorkers_,
+			(float)queues_[Heavy].numActiveWorkers_, Middle, Heavy); break;
 		}
 
 		++numToNotify;

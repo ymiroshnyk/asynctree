@@ -2,7 +2,7 @@
 
 #include "asynctree_config.h"
 
-namespace AST
+namespace ast
 {
 
 typedef std::shared_ptr<class QtConnector> QtConnectorP;

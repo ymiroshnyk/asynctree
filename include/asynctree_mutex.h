@@ -5,7 +5,7 @@
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
 
-namespace AST
+namespace ast
 {
 
 class Service;

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace AST
+namespace ast
 {
 
 enum EnumAccessKey

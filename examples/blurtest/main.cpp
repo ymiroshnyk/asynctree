@@ -5,7 +5,7 @@
 
 #include "main.h"
 
-AST::Service service;
+ast::Service service;
 
 
 MainWindow::MainWindow(QWidget* parent)
@@ -60,41 +60,35 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 
 		state_ = S_InWork;
 
-		work_ = service.startAutoTask(AST::TW_Light, [&, rect1, rect2, rect3, rect4]()
-		{
-			blurRect(AST::TW_Light, 6, rect1, true);
-			blurRect(AST::TW_Middle, 4, rect2, true);
-			blurRect(AST::TW_Heavy, 2, rect3, true);
-			blurRect(AST::TW_Heavy, 2, rect4, true);
-		}, AST::TaskCallbacks()
-			.succeeded([&, rect1, rect2, rect3, rect4, connector { *connector_ }]()
-		{
-			if (!connector->postFunc([&, rect1, rect2, rect3, rect4]
-			{
-				source_ = target_;
-				initTarget();
+		work_ = service.startTask(ast::Light, [&, rect1, rect2, rect3, rect4]() {
+			blurRect(ast::Light, 6, rect1, true);
+			blurRect(ast::Middle, 4, rect2, true);
+			blurRect(ast::Heavy, 2, rect3, true);
+			blurRect(ast::Heavy, 2, rect4, true);
+		}, ast::TaskCallbacks()
+										  .succeeded([&, rect1, rect2, rect3, rect4, connector{*connector_}]() {
+											  if (!connector->postFunc([&, rect1, rect2, rect3, rect4] {
+												  source_ = target_;
+												  initTarget();
 
-				work_ = service.startAutoTask(AST::TW_Light, [&, rect1, rect2, rect3, rect4]()
-				{
-					blurRect(AST::TW_Light, 6, rect1, false);
-					blurRect(AST::TW_Middle, 4, rect2, false);
-					blurRect(AST::TW_Heavy, 2, rect3, false);
-					blurRect(AST::TW_Heavy, 2, rect4, false);
-				}, AST::TaskCallbacks().finished([&]()
-				{
-					state_ = S_After;
-					work_.reset();
-				}));
-			}))
-			{
-				// window is killed
-			}
-		})
-			.interrupted([&]()
-		{
-			state_ = S_After;
-			work_.reset();
-		}));
+												  work_ = service.startTask(ast::Light,
+																			[&, rect1, rect2, rect3, rect4]() {
+																				blurRect(ast::Light, 6, rect1, false);
+																				blurRect(ast::Middle, 4, rect2, false);
+																				blurRect(ast::Heavy, 2, rect3, false);
+																				blurRect(ast::Heavy, 2, rect4, false);
+																			}, ast::TaskCallbacks().finished([&]() {
+															  state_ = S_After;
+															  work_.reset();
+														  }));
+											  })) {
+												  // window is killed
+											  }
+										  })
+										  .interrupted([&]() {
+											  state_ = S_After;
+											  work_.reset();
+										  }));
 	}
 	else if (state_ == S_InWork)
 	{
@@ -110,7 +104,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 	}
 }
 
-void MainWindow::blurRect(AST::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor)
+void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor)
 {
 	auto task = service.currentTask();
 	if (task->isInterrupted())
@@ -118,22 +112,18 @@ void MainWindow::blurRect(AST::EnumTaskWeight weight, uint depthLeft, QRect rect
 
 	if (depthLeft == 0 || rect.width() <= 2 || rect.height() <= 2)
 	{
-		service.startAutoTask(weight, [&, rect, hor]()
-		{
+		service.startTask(weight, [&, rect, hor]() {
 			auto task = service.currentTask();
 
-			for (uint y = rect.top(); y <= (uint)rect.bottom(); ++y)
-			{
+			for (uint y = rect.top(); y <= (uint) rect.bottom(); ++y) {
 				if (task->isInterrupted())
 					return;
 
-				for (uint x = rect.left(); x <= (uint)rect.right(); ++x)
-				{
+				for (uint x = rect.left(); x <= (uint) rect.right(); ++x) {
 					blurPixel(x, y, hor);
 				}
 			}
-		}, AST::TaskCallbacks().finished([&]()
-		{
+		}, ast::TaskCallbacks().finished([&]() {
 			needsUpdate_.store(true);
 		}));
 	}
@@ -147,23 +137,19 @@ void MainWindow::blurRect(AST::EnumTaskWeight weight, uint depthLeft, QRect rect
 		QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
 		QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
 
-		service.startAutoTask(AST::TW_Light, [&, weight, depthLeft, rect1, hor]()
-		{
+		service.startTask(ast::Light, [&, weight, depthLeft, rect1, hor]() {
 			blurRect(weight, depthLeft - 1, rect1, hor);
 		});
 
-		service.startAutoTask(AST::TW_Light, [&, weight, depthLeft, rect2, hor]()
-		{
+		service.startTask(ast::Light, [&, weight, depthLeft, rect2, hor]() {
 			blurRect(weight, depthLeft - 1, rect2, hor);
 		});
 
-		service.startAutoTask(AST::TW_Light, [&, weight, depthLeft, rect3, hor]()
-		{
+		service.startTask(ast::Light, [&, weight, depthLeft, rect3, hor]() {
 			blurRect(weight, depthLeft - 1, rect3, hor);
 		});
 
-		service.startAutoTask(AST::TW_Light, [&, weight, depthLeft, rect4, hor]()
-		{
+		service.startTask(ast::Light, [&, weight, depthLeft, rect4, hor]() {
 			blurRect(weight, depthLeft - 1, rect4, hor);
 		});
 	}

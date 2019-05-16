@@ -2,7 +2,7 @@
 #include "asynctree_service.h"
 #include "asynctree_mutex.h"
 
-namespace AST
+namespace ast
 {
 
 TaskImpl::TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks)

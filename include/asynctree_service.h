@@ -5,7 +5,7 @@
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
 
-namespace AST
+namespace ast
 {
 
 class Mutex;
@@ -54,8 +54,8 @@ public:
 	Service(const uint numThreads = std::thread::hardware_concurrency());
 	~Service();
 
+	TaskP startTopmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
 	TaskP startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startAutoTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
 	TaskP startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
 
 	void waitUtilEverythingIsDone();
