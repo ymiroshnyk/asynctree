@@ -29,8 +29,6 @@ Service::Service(const uint numThreads)
 
 	for (uint i = 0; i < numWorkers; ++i)
 		workers_.push_back(std::thread([&]() { _workerFunc(); }));
-
-
 }
 
 Service::~Service()

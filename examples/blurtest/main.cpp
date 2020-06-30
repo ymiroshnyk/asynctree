@@ -10,7 +10,6 @@ ast::Service service;
 
 MainWindow::MainWindow(QWidget* parent)
 : QWidget(parent) 
-, connector_(this)
 , needsUpdate_(false)
 {
 	original_ = QImage("image.png");
@@ -43,52 +42,35 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+	if (auto workP = work_.lock())
+		workP->interrupt();
+
+	service.waitUtilEverythingIsDone();
+
+	int i = 0;
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 {
 	if (state_ == S_Before)
 	{
-		const QRect rect = source_.rect();
-		const uint halfWidth = rect.width() / 2;
-		const uint halfHeight = rect.height() / 2;
-
-		QRect rect1 = QRect(rect.left(), rect.top(), halfWidth, halfHeight);
-		QRect rect2 = QRect(rect1.right() + 1, rect.top(), rect.right() - rect1.right(), halfHeight);
-		QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
-		QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
-
 		state_ = S_InWork;
 
-		work_ = service.startTask(ast::Light, [&, rect1, rect2, rect3, rect4]() {
-			blurRect(ast::Light, 6, rect1, true);
-			blurRect(ast::Middle, 4, rect2, true);
-			blurRect(ast::Heavy, 2, rect3, true);
-			blurRect(ast::Heavy, 2, rect4, true);
-		}, ast::TaskCallbacks()
-										  .succeeded([&, rect1, rect2, rect3, rect4, connector{*connector_}]() {
-											  if (!connector->postFunc([&, rect1, rect2, rect3, rect4] {
-												  source_ = target_;
-												  initTarget();
+		work_ = service.startTask(ast::Light, [this]() { blurImage(true); }, ast::TaskCallbacks()
+		.succeeded([this]() {
+			source_ = target_;
+			initTarget();
 
-												  work_ = service.startTask(ast::Light,
-																			[&, rect1, rect2, rect3, rect4]() {
-																				blurRect(ast::Light, 6, rect1, false);
-																				blurRect(ast::Middle, 4, rect2, false);
-																				blurRect(ast::Heavy, 2, rect3, false);
-																				blurRect(ast::Heavy, 2, rect4, false);
-																			}, ast::TaskCallbacks().finished([&]() {
-															  state_ = S_After;
-															  work_.reset();
-														  }));
-											  })) {
-												  // window is killed
-											  }
-										  })
-										  .interrupted([&]() {
-											  state_ = S_After;
-											  work_.reset();
-										  }));
+			work_ = service.startTask(ast::Light, [this]() { blurImage(false); }, ast::TaskCallbacks()
+			.finished([&]() {
+				state_ = S_After;
+				work_.reset();
+			}));
+		})
+		.interrupted([this]() {
+			state_ = S_After;
+			work_.reset();
+		}));
 	}
 	else if (state_ == S_InWork)
 	{
@@ -103,6 +85,22 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 		update();
 	}
 }
+
+void MainWindow::blurImage(bool horizontal) {
+	const QRect rect = source_.rect();
+	const uint halfWidth = rect.width() / 2;
+	const uint halfHeight = rect.height() / 2;
+
+	const QRect rect1 = QRect(rect.left(), rect.top(), halfWidth, halfHeight);
+	const QRect rect2 = QRect(rect1.right() + 1, rect.top(), rect.right() - rect1.right(), halfHeight);
+	const QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
+	const QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
+
+	blurRect(ast::Light, 6, rect1, horizontal);
+	blurRect(ast::Middle, 4, rect2, horizontal);
+	blurRect(ast::Heavy, 2, rect3, horizontal);
+	blurRect(ast::Heavy, 2, rect4, horizontal);
+};
 
 void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor)
 {
@@ -249,7 +247,7 @@ int main(int argc, char *argv[])
 
 	// TaskImpl parented to the application so that it
 	// will be deleted by the application.
-	MainWindow *window = new MainWindow();
+	auto window = std::make_unique<MainWindow>();
 	window->showMaximized();
 
 	// This will cause the application to exit when

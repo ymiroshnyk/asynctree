@@ -16,8 +16,6 @@ class MainWindow : public QWidget
 {
 	Q_OBJECT
 
-	ast::ScopedQtConnector connector_;
-
 	enum EnumState
 	{
 		S_Before,
@@ -56,6 +54,7 @@ private:
 	void initTarget();
 	void blurPixel(uint x, uint y, bool hor);
 	void blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
+	void blurImage(bool horizontal);
 
 public slots :
 	
