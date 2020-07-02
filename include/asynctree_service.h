@@ -11,14 +11,9 @@ namespace ast
 class Mutex;
 class TaskImpl;
 
-class Service : boost::noncopyable
+class Service
 {
 	const uint numThreads_;
-
-	struct WorkerData
-	{
-		TaskImpl* currentTask_;
-	};
 
 	struct WeightQueue
 	{
@@ -38,7 +33,7 @@ class Service : boost::noncopyable
 
 	WeightQueue queues_[TW_Quantity];
 
-	boost::thread_specific_ptr<WorkerData> workerData_;
+	static thread_local TaskImpl* currentTask_;
 	std::vector<std::thread> workers_;
 	std::condition_variable workersCV_;
 
@@ -49,6 +44,9 @@ class Service : boost::noncopyable
 	bool shuttingDown_;
 
 	std::condition_variable doneCV_;
+
+	Service(const Service&) = delete;
+	Service& operator=(const Service&) = delete;
 
 public:
 	Service(const uint numThreads = std::thread::hardware_concurrency());

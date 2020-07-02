@@ -32,9 +32,6 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
 	PUBLIC
-	Boost::boost
-	Boost::system
-	Boost::thread
 )
 
 add_subdirectory(examples)

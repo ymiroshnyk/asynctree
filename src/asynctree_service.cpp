@@ -4,6 +4,8 @@
 namespace ast
 {
 
+thread_local TaskImpl* Service::currentTask_ = nullptr;
+
 Service::Service(const uint numThreads)
 	: shuttingDown_(false)
 	, numThreads_(numThreads)
@@ -28,7 +30,7 @@ Service::Service(const uint numThreads)
 	const uint numWorkers = numThreads * TW_Quantity;
 
 	for (uint i = 0; i < numWorkers; ++i)
-		workers_.push_back(std::thread([&]() { _workerFunc(); }));
+		workers_.push_back(std::thread([this]() { _workerFunc(); }));
 }
 
 Service::~Service()
@@ -59,9 +61,7 @@ Service::~Service()
 
 Task& Service::task(EnumTaskWeight weight, TaskWorkFunc workFunc)
 {
-	auto workerData = workerData_.get();
-
-	if (workerData && workerData->currentTask_)
+	if (currentTask_)
 		return childTask(weight, std::move(workFunc));
 	else
 		return topmostTask(weight, std::move(workFunc));
@@ -74,11 +74,8 @@ Task& Service::topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
 
 Task& Service::childTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
 {
-	auto workerData = workerData_.get();
-	assert(workerData);
-
-	TaskImpl* parentTask = workerData->currentTask_;
-	return *Task::_create(KEY, *this, parentTask, weight, std::move(workFunc));
+	assert(currentTask_);
+	return *Task::_create(KEY, *this, currentTask_, weight, std::move(workFunc));
 }
 
 void Service::_startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl)
@@ -123,19 +120,12 @@ void Service::_addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight we
 
 void Service::_setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task)
 {
-	assert(workerData_.get());
-	workerData_->currentTask_ = task;
+	currentTask_ = task;
 }
 
 Task* Service::currentTask()
 {
-	if (auto workerData = workerData_.get())
-		if (auto taskImpl = workerData->currentTask_)
-		{
-			return &taskImpl->task();
-		}
-
-	return nullptr;
+	return currentTask_ ? &currentTask_->task() : nullptr;
 }
 
 void Service::waitUtilEverythingIsDone()
@@ -289,8 +279,6 @@ void Service::_moveTaskToWorkers(EnumTaskWeight weight)
 
 void Service::_workerFunc()
 {
-	workerData_.reset(new WorkerData());
-
 	std::unique_lock<std::mutex> lock(mutex_);
 
 	while (!shuttingDown_)

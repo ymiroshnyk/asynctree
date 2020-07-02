@@ -1,8 +1,5 @@
 #pragma once
 
-#include <boost/noncopyable.hpp>
-#include <boost/thread/tss.hpp>
-
 #include <thread>
 #include <condition_variable>
 #include <mutex>
