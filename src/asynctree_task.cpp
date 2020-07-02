@@ -2,6 +2,9 @@
 #include "asynctree_service.h"
 #include "asynctree_mutex.h"
 
+#include <atomic>
+#include <algorithm>
+
 namespace ast
 {
 namespace 

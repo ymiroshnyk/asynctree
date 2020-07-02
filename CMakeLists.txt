@@ -27,3 +27,4 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 add_subdirectory(examples)
+add_subdirectory(tests)

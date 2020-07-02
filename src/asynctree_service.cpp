@@ -7,8 +7,7 @@ namespace ast
 thread_local TaskImpl* Service::currentTask_ = nullptr;
 
 Service::Service(const uint numThreads)
-	: shuttingDown_(false)
-	, numThreads_(numThreads)
+	: numThreads_(numThreads)
 {
 	for (uint weight = 0; weight < TW_Quantity; ++weight)
 	{

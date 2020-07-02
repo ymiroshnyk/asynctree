@@ -37,11 +37,11 @@ class Service
 	std::vector<std::thread> workers_;
 	std::condition_variable workersCV_;
 
-	TaskImpl* firstWorkerTask_;
-	TaskImpl* lastWorkerTask_;
-	uint numWorkingTasks_;
+	TaskImpl* firstWorkerTask_ = nullptr;
+	TaskImpl* lastWorkerTask_ = nullptr;
+	uint numWorkingTasks_ = 0;
 
-	bool shuttingDown_;
+	bool shuttingDown_ = false;
 
 	std::condition_variable doneCV_;
 
@@ -57,7 +57,7 @@ public:
 	Task& childTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
 
 	void waitUtilEverythingIsDone();
-	Task* currentTask();
+	static Task* currentTask();
 
 	void _startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl);
 	void _addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task);

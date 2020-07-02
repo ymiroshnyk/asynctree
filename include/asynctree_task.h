@@ -49,12 +49,10 @@ private:
 
 	mutable bool interrupted_;
 
-	// ���-�� �����, ������� ������ ��������� ���������� ��� ���������� �������� �����
 	uint numChildrenToComplete_;
 
 	struct WeightBuffer
 	{
-		// ���� � �������. ��� ��� ������� �� ����������� � �� ����������� � ������� (�� ����� S_Created)
 		TaskImpl* firstChild_;
 		TaskImpl* lastChild_;
 	};
