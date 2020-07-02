@@ -54,13 +54,14 @@ public:
 	Service(const uint numThreads = std::thread::hardware_concurrency());
 	~Service();
 
-	TaskP startTopmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
+	Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& childTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
 
 	void waitUtilEverythingIsDone();
 	Task* currentTask();
 
+	void _startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl);
 	void _addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task);
 	void _setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task);
 

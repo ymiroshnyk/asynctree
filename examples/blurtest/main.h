@@ -5,8 +5,6 @@
 #include <QWidget>
 #include <atomic>
 
-#include "asynctree_qt_connector.h"
-
 typedef unsigned int uint;
 
 class Task;
@@ -54,7 +52,7 @@ private:
 	void initTarget();
 	void blurPixel(uint x, uint y, bool hor);
 	void blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
-	void blurImage(bool horizontal);
+	ast::Task& blurImageA(bool horizontal);
 
 public slots :
 	

@@ -28,19 +28,21 @@ public:
 	Mutex(Service& service);
 	~Mutex();
 
-	TaskP startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startAutoTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
+	Task& rootTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& childTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
 
-	TaskP startSharedTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startSharedAutoTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
-	TaskP startSharedChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
+	Task& sharedRootTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& sharedTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task& sharedChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
 
+	void _startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl);
 	void _taskFinished(AccessKey<TaskImpl>);
+
 private:
-	TaskP _startTask(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks);
-	TaskP _startAutoTask(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks);
-	TaskP _startChildTask(bool shared, Task* parent, EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks);
+	TaskP _rootTask(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc);
+	TaskP _task(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc);
+	TaskP _childTask(bool shared, Task* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
 	bool _checkIfTaskCanBeStartedAndIncCounters(bool shared);
 	void _queueTask(TaskImpl& task);
 	bool _checkIfTaskCanBeStartedFromQueueAndStart();

@@ -1,12 +1,15 @@
 #pragma once
 
 #include "asynctree_config.h"
-#include "asynctree_task_callbacks.h"
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
 
 namespace ast
 {
+
+typedef std::function<void()> TaskSucceededCallback;
+typedef std::function<void()> TaskInterruptedCallback;
+typedef std::function<void()> TaskFinishedCallback;
 
 class Service;
 class Mutex;
@@ -36,7 +39,9 @@ private:
 	TaskImpl* parent_;
 
 	TaskWorkFunc workFunc_;
-	TaskCallbacks callbacks_;
+	TaskSucceededCallback succeededCb_;
+	TaskInterruptedCallback interruptedCb_;
+	TaskFinishedCallback finishedCb_;
 
 	std::mutex taskMutex_;
 
@@ -57,7 +62,8 @@ private:
 	WeightBuffer weightBuffers_[TW_Quantity];
 
 public:
-	TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks);
+	TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, 
+		EnumTaskWeight weight, TaskWorkFunc workFunc);
 	~TaskImpl();
 
 	Task& task();
@@ -67,6 +73,11 @@ public:
 	void addChildTask(EnumTaskWeight weight, TaskImpl& child);
 	void notifyDeferredTask();
 	void addDeferredTask(EnumTaskWeight weight, TaskImpl& child);
+
+	void succeeded(TaskSucceededCallback succeeded);
+	void interrupted(TaskInterruptedCallback interrupted);
+	void finished(TaskFinishedCallback finished);
+	void start();
 
 	void interrupt();
 	bool isInterrupted() const;
@@ -89,11 +100,17 @@ class Task : public std::enable_shared_from_this<Task>
 
 	struct Private {};
 public:
-	Task(Private, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks);
+	Task(Private, Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
 	~Task();
 
-	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent, TaskWorkFunc workFunc, TaskCallbacks callbacks = TaskCallbacks());
+	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent, 
+		EnumTaskWeight weight, TaskWorkFunc workFunc);
 	TaskImpl& _impl(AccessKey<Service, Mutex>);
+
+	Task& succeeded(TaskSucceededCallback succeeded);
+	Task& interrupted(TaskInterruptedCallback interrupted);
+	Task& finished(TaskFinishedCallback finished);
+	TaskP start();
 
 	void interrupt();
 	bool isInterrupted() const;

@@ -56,21 +56,23 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 	{
 		state_ = S_InWork;
 
-		work_ = service.startTask(ast::Light, [this]() { blurImage(true); }, ast::TaskCallbacks()
+		work_ = blurImageA(true)
 		.succeeded([this]() {
 			source_ = target_;
 			initTarget();
 
-			work_ = service.startTask(ast::Light, [this]() { blurImage(false); }, ast::TaskCallbacks()
-			.finished([&]() {
+			work_ = blurImageA(false)
+			.finished([this]() {
 				state_ = S_After;
 				work_.reset();
-			}));
+			})
+			.start();
 		})
 		.interrupted([this]() {
 			state_ = S_After;
 			work_.reset();
-		}));
+		})
+		.start();
 	}
 	else if (state_ == S_InWork)
 	{
@@ -86,20 +88,23 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 	}
 }
 
-void MainWindow::blurImage(bool horizontal) {
-	const QRect rect = source_.rect();
-	const uint halfWidth = rect.width() / 2;
-	const uint halfHeight = rect.height() / 2;
+ast::Task& MainWindow::blurImageA(bool horizontal) 
+{
+	return service.task(ast::Light, [=]() {
+		const QRect rect = source_.rect();
+		const uint halfWidth = rect.width() / 2;
+		const uint halfHeight = rect.height() / 2;
 
-	const QRect rect1 = QRect(rect.left(), rect.top(), halfWidth, halfHeight);
-	const QRect rect2 = QRect(rect1.right() + 1, rect.top(), rect.right() - rect1.right(), halfHeight);
-	const QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
-	const QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
+		const QRect rect1 = QRect(rect.left(), rect.top(), halfWidth, halfHeight);
+		const QRect rect2 = QRect(rect1.right() + 1, rect.top(), rect.right() - rect1.right(), halfHeight);
+		const QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
+		const QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
 
-	blurRect(ast::Light, 6, rect1, horizontal);
-	blurRect(ast::Middle, 4, rect2, horizontal);
-	blurRect(ast::Heavy, 2, rect3, horizontal);
-	blurRect(ast::Heavy, 2, rect4, horizontal);
+		blurRect(ast::Light, 6, rect1, horizontal);
+		blurRect(ast::Middle, 4, rect2, horizontal);
+		blurRect(ast::Heavy, 2, rect3, horizontal);
+		blurRect(ast::Heavy, 2, rect4, horizontal);
+	});
 };
 
 void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor)
@@ -110,7 +115,7 @@ void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect
 
 	if (depthLeft == 0 || rect.width() <= 2 || rect.height() <= 2)
 	{
-		service.startTask(weight, [&, rect, hor]() {
+		service.task(weight, [&, rect, hor]() {
 			auto task = service.currentTask();
 
 			for (uint y = rect.top(); y <= (uint) rect.bottom(); ++y) {
@@ -121,9 +126,11 @@ void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect
 					blurPixel(x, y, hor);
 				}
 			}
-		}, ast::TaskCallbacks().finished([&]() {
+		})
+		.finished([&]() {
 			needsUpdate_.store(true);
-		}));
+		})
+		.start();
 	}
 	else
 	{
@@ -135,21 +142,21 @@ void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect
 		QRect rect3 = QRect(rect.left(), rect1.bottom() + 1, halfWidth, rect.bottom() - rect1.bottom());
 		QRect rect4 = QRect(rect1.right() + 1, rect1.bottom() + 1, rect2.width(), rect3.height());
 
-		service.startTask(ast::Light, [&, weight, depthLeft, rect1, hor]() {
+		service.task(ast::Light, [&, weight, depthLeft, rect1, hor]() {
 			blurRect(weight, depthLeft - 1, rect1, hor);
-		});
+		}).start();
 
-		service.startTask(ast::Light, [&, weight, depthLeft, rect2, hor]() {
+		service.task(ast::Light, [&, weight, depthLeft, rect2, hor]() {
 			blurRect(weight, depthLeft - 1, rect2, hor);
-		});
+		}).start();
 
-		service.startTask(ast::Light, [&, weight, depthLeft, rect3, hor]() {
+		service.task(ast::Light, [&, weight, depthLeft, rect3, hor]() {
 			blurRect(weight, depthLeft - 1, rect3, hor);
-		});
+		}).start();
 
-		service.startTask(ast::Light, [&, weight, depthLeft, rect4, hor]() {
+		service.task(ast::Light, [&, weight, depthLeft, rect4, hor]() {
 			blurRect(weight, depthLeft - 1, rect4, hor);
-		});
+		}).start();
 	}
 };
 

@@ -57,33 +57,40 @@ Service::~Service()
 	}
 }
 
-TaskP Service::startTopmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
-{
-	auto task = Task::_create(KEY, *this, nullptr, std::move(workFunc), std::move(callbacks));
-	_addToQueue(KEY, weight, task->_impl(KEY));
-	return std::move(task);
-}
-
-TaskP Service::startTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
+Task& Service::task(EnumTaskWeight weight, TaskWorkFunc workFunc)
 {
 	auto workerData = workerData_.get();
 
 	if (workerData && workerData->currentTask_)
-		return startChildTask(weight, std::move(workFunc), std::move(callbacks));
+		return childTask(weight, std::move(workFunc));
 	else
-		return startTopmostTask(weight, std::move(workFunc), std::move(callbacks));
+		return topmostTask(weight, std::move(workFunc));
 }
 
-TaskP Service::startChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc, TaskCallbacks callbacks)
+Task& Service::topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
+{
+	return *Task::_create(KEY, *this, nullptr, weight, std::move(workFunc));
+}
+
+Task& Service::childTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
 {
 	auto workerData = workerData_.get();
 	assert(workerData);
 
 	TaskImpl* parentTask = workerData->currentTask_;
+	return *Task::_create(KEY, *this, parentTask, weight, std::move(workFunc));
+}
 
-	auto task = Task::_create(KEY, *this, parentTask, std::move(workFunc), std::move(callbacks));
-	parentTask->addChildTask(weight, task->_impl(KEY));
-	return std::move(task);
+void Service::_startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl)
+{
+	if (auto parentTask = taskImpl.parent())
+	{
+		parentTask->addChildTask(taskImpl.weight_, taskImpl);
+	}
+	else
+	{
+		_addToQueue(KEY, taskImpl.weight_, taskImpl);
+	}
 }
 
 void Service::_addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task)
