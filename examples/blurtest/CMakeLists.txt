@@ -3,10 +3,6 @@
 cmake_minimum_required (VERSION 2.6)
 project (blurtest)
 
-# boost >>
-find_package(Boost REQUIRED COMPONENTS chrono)
-# << boost
-
 # Qt >>
 find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
 set(CMAKE_AUTOMOC ON)
@@ -31,7 +27,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
 	asynctree 
-	Boost::chrono
 	Qt5::Widgets
 )
 
