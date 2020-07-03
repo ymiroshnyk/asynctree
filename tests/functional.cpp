@@ -196,7 +196,7 @@ TEST_F(Functional, StartTaskFromCallback)
 	EXPECT_EQ(sequence, std::vector<int>({ 0, 1, 2, 3, 4 }));
 }
 
-TEST_F(Functional, 100KTasks)
+TEST_F(Functional, Stress_10MTasks)
 {
 	std::atomic<int> counter(0);
 
@@ -217,7 +217,13 @@ TEST_F(Functional, 100KTasks)
 									for (int e = 0; e < 10; ++e)
 									{
 										service_->task(ast::Light, [&] {
-											counter.fetch_add(1);
+											for (int f = 0; f < 100; ++f)
+											{
+												service_->task(ast::Light, [&] {
+													counter.fetch_add(1);
+												})
+												.start();
+											}
 										})
 										.start();
 									}
@@ -235,7 +241,73 @@ TEST_F(Functional, 100KTasks)
 	}
 
 	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(counter.load(), 100000);
+	EXPECT_EQ(counter.load(), 10000000);
+}
+
+TEST_F(Functional, Stress_10MTasksWithCallback)
+{
+	std::atomic<int> counter(0);
+
+	const auto size = sizeof(ast::Task);
+
+	for (int a = 0; a < 10; ++a)
+	{
+		service_->task(ast::Light, [&] {
+			for (int b = 0; b < 10; ++b)
+			{
+				service_->task(ast::Light, [&] {
+					for (int c = 0; c < 10; ++c)
+					{
+						service_->task(ast::Light, [&] {
+							for (int d = 0; d < 10; ++d)
+							{
+								service_->task(ast::Light, [&] {
+									for (int e = 0; e < 10; ++e)
+									{
+										service_->task(ast::Light, [&] {
+											for (int f = 0; f < 100; ++f)
+											{
+												service_->task(ast::Light, [&] {
+													counter.fetch_add(1);
+												})
+												.succeeded([&] {})
+												.interrupted([&] {})
+												.finished([&] {})
+												.start();
+											}
+										})
+										.succeeded([&] {})
+										.interrupted([&] {})
+										.finished([&] {})
+										.start();
+									}
+								})
+								.succeeded([&] {})
+								.interrupted([&] {})
+								.finished([&] {})
+								.start();
+							}
+						})
+						.succeeded([&] {})
+						.interrupted([&] {})
+						.finished([&] {})
+						.start();
+					}
+				})
+				.succeeded([&] {})
+				.interrupted([&] {})
+				.finished([&] {})
+				.start();
+			}
+		})
+		.succeeded([&] {})
+		.interrupted([&] {})
+		.finished([&] {})
+		.start();
+	}
+
+	service_->waitUtilEverythingIsDone();
+	EXPECT_EQ(counter.load(), 10000000);
 }
 
 TEST_F(Functional, TaskDeletedOnCallback)
