@@ -7,9 +7,6 @@
 
 typedef unsigned int uint;
 
-class Task;
-
-
 class MainWindow : public QWidget
 {
 	Q_OBJECT
@@ -38,24 +35,16 @@ class MainWindow : public QWidget
 	QImage source_;
 	QImage target_;
 
-	std::atomic_bool needsUpdate_;
-
 public:
 	MainWindow(QWidget *parent = 0);
 	~MainWindow();
 
 	void mouseReleaseEvent(QMouseEvent* evt) override;
 	void paintEvent(QPaintEvent* evt) override;
-	void timerEvent(QTimerEvent* evt) override;
 
 private:
 	void initTarget();
 	void blurPixel(uint x, uint y, bool hor);
 	void blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
 	ast::Task& blurImageA(bool horizontal);
-
-public slots :
-	
-
-signals:
 };

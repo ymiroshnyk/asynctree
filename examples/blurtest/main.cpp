@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QPainter>
 
+#include <asynctree_qt.h>
+
 #include "main.h"
 
 ast::Service service;
@@ -10,7 +12,6 @@ ast::Service service;
 
 MainWindow::MainWindow(QWidget* parent)
 : QWidget(parent) 
-, needsUpdate_(false)
 {
 	original_ = QImage("image.png");
 	if (original_.format() != QImage::Format_RGB888)
@@ -36,8 +37,6 @@ MainWindow::MainWindow(QWidget* parent)
 	source_ = original_;
 	state_ = S_Before;
 	initTarget();
-
-	startTimer(100);
 }
 
 MainWindow::~MainWindow()
@@ -46,8 +45,6 @@ MainWindow::~MainWindow()
 		workP->interrupt();
 
 	service.waitUtilEverythingIsDone();
-
-	int i = 0;
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
@@ -57,21 +54,21 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 		state_ = S_InWork;
 
 		work_ = blurImageA(true)
-		.succeeded([this]() {
+		.succeeded(ast::qt::contextFunc(this, [this]() {
 			source_ = target_;
 			initTarget();
 
 			work_ = blurImageA(false)
-			.finished([this]() {
+			.finished(ast::qt::contextFunc(this, [this]() {
 				state_ = S_After;
 				work_.reset();
-			})
+			}))
 			.start();
-		})
-		.interrupted([this]() {
+		}))
+		.interrupted(ast::qt::contextFunc(this, [this]() {
 			state_ = S_After;
 			work_.reset();
-		})
+		}))
 		.start();
 	}
 	else if (state_ == S_InWork)
@@ -127,9 +124,9 @@ void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect
 				}
 			}
 		})
-		.finished([&]() {
-			needsUpdate_.store(true);
-		})
+		.finished(ast::qt::contextFunc(this, [this]() {
+			update(); 
+		}))
 		.start();
 	}
 	else
@@ -238,14 +235,6 @@ void MainWindow::paintEvent(QPaintEvent* evt)
 	auto resultRect = QRectF(x, y, resultWidth, resultHeight);
 	p.drawImage(resultRect, source_);
 	p.drawImage(resultRect, target_);
-}
-
-void MainWindow::timerEvent(QTimerEvent* evt)
-{
-	if (needsUpdate_.exchange(false))
-	{
-		update();
-	}
 }
 
 int main(int argc, char *argv[])
