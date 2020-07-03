@@ -39,9 +39,9 @@ private:
 	TaskImpl* parent_;
 
 	TaskWorkFunc workFunc_;
-	TaskSucceededCallback succeededCb_;
-	TaskInterruptedCallback interruptedCb_;
-	TaskFinishedCallback finishedCb_;
+	std::unique_ptr<VoidFunc> succeededCb_;
+	std::unique_ptr<VoidFunc> interruptedCb_;
+	std::unique_ptr<VoidFunc> finishedCb_;
 
 	std::mutex taskMutex_;
 
@@ -72,9 +72,9 @@ public:
 	void notifyDeferredTask();
 	void addDeferredTask(EnumTaskWeight weight, TaskImpl& child);
 
-	void succeeded(TaskSucceededCallback succeeded);
-	void interrupted(TaskInterruptedCallback interrupted);
-	void finished(TaskFinishedCallback finished);
+	void succeeded(std::unique_ptr<VoidFunc> succeeded);
+	void interrupted(std::unique_ptr<VoidFunc> interrupted);
+	void finished(std::unique_ptr<VoidFunc> finished);
 	void start();
 
 	void interrupt();
@@ -82,7 +82,6 @@ public:
 
 private:
 	void _addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child, std::unique_lock<std::mutex>& lock);
-	void _interruptFromExec(std::unique_lock<std::mutex>& lock);
 	void _interruptFromParent();
 
 	void _onFinished(std::unique_lock<std::mutex>& lock);
@@ -105,9 +104,30 @@ public:
 		EnumTaskWeight weight, TaskWorkFunc workFunc);
 	TaskImpl& _impl(AccessKey<Service, Mutex>);
 
-	Task& succeeded(TaskSucceededCallback succeeded);
-	Task& interrupted(TaskInterruptedCallback interrupted);
-	Task& finished(TaskFinishedCallback finished);
+	template <typename TFunc>
+	inline Task& succeeded(TFunc succeeded)
+	{
+		auto voidFunc = std::make_unique<VoidFuncTyped<TFunc>>(std::move(succeeded));
+		impl_.succeeded(std::move(voidFunc));
+		return *this;
+	}
+
+	template <typename TFunc>
+	inline Task& interrupted(TFunc interrupted)
+	{
+		auto voidFunc = std::make_unique<VoidFuncTyped<TFunc>>(std::move(interrupted));
+		impl_.interrupted(std::move(voidFunc));
+		return *this;
+	}
+
+	template <typename TFunc>
+	inline Task& finished(TFunc finished)
+	{
+		auto voidFunc = std::make_unique<VoidFuncTyped<TFunc>>(std::move(finished));
+		impl_.finished(std::move(voidFunc));
+		return *this;
+	}
+
 	TaskP start();
 
 	void interrupt();

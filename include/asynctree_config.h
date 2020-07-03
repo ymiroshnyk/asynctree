@@ -14,6 +14,26 @@ namespace ast
 
 typedef unsigned int uint;
 
+class VoidFunc
+{
+public:
+	virtual ~VoidFunc() {}
+	virtual void exec() = 0;
+};
+
+template <typename T>
+class VoidFuncTyped : public VoidFunc
+{
+	T func_;
+public:
+	VoidFuncTyped(T func) : func_(std::move(func)) {}
+
+	void exec() override
+	{
+		func_();
+	}
+};
+
 typedef std::function<void()> TaskWorkFunc;
 
 enum EnumTaskWeight

@@ -10,18 +10,6 @@ namespace ast
 namespace 
 {
 
-std::function<void()> chainFunction(std::function<void()>&& prev, std::function<void()>&& next)
-{
-	if (prev) {
-		return [_prev{ std::move(prev) }, _next{ std::move(next) }]() {
-			_prev();
-			_next();
-		};
-	}
-
-	return std::move(next);
-}
-
 }
 
 TaskImpl::TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, 
@@ -69,7 +57,7 @@ void TaskImpl::exec(EnumTaskWeight weight)
 		{
 		case S_Created:
 		{
-			_interruptFromExec(lock);
+			_onFinished(lock);
 			return;
 		}
 
@@ -97,7 +85,7 @@ void TaskImpl::exec(EnumTaskWeight weight)
 
 			if (numChildrenToComplete_ == 0)
 			{
-				_interruptFromExec(lock);
+				_onFinished(lock);
 			}
 			return;
 		}
@@ -182,19 +170,19 @@ void TaskImpl::addDeferredTask(EnumTaskWeight weight, TaskImpl& child)
 	_addChildTaskNoIncCounter(weight, child, lock);
 }
 
-void TaskImpl::succeeded(TaskSucceededCallback succeeded)
+void TaskImpl::succeeded(std::unique_ptr<VoidFunc> succeeded)
 {
-	succeededCb_ = chainFunction(std::move(succeededCb_), std::move(succeeded));
+	succeededCb_ = std::move(succeeded);
 }
 
-void TaskImpl::interrupted(TaskInterruptedCallback interrupted)
+void TaskImpl::interrupted(std::unique_ptr<VoidFunc> interrupted)
 {
-	interruptedCb_ = chainFunction(std::move(interruptedCb_), std::move(interrupted));
+	interruptedCb_ = std::move(interrupted);
 }
 
-void TaskImpl::finished(TaskFinishedCallback finished)
+void TaskImpl::finished(std::unique_ptr<VoidFunc> finished)
 {
-	finishedCb_ = chainFunction(std::move(finishedCb_), std::move(finished));
+	finishedCb_ = std::move(finished);
 }
 
 void TaskImpl::start()
@@ -258,35 +246,6 @@ void TaskImpl::_addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child,
 	}
 }
 
-void TaskImpl::_interruptFromExec(std::unique_lock<std::mutex>& lock)
-{
-	assert(state_ == S_Created || state_ == S_WaitForChildren);
-
-	state_ = S_Done;
-
-	service_._setCurrentTask(KEY, parent_);
-
-	lock.unlock();
-
-	if (interruptedCb_)
-		interruptedCb_();
-	else if (parent_)
-		parent_->interrupt();
-
-	if (finishedCb_)
-		finishedCb_();
-
-	if (mutex_)
-		mutex_->_taskFinished(KEY);
-
-	if (parent_)
-	{
-		parent_->_notifyChildFinished();
-	}
-
-	destroy();
-}
-
 void TaskImpl::_interruptFromParent()
 {
 	std::unique_lock<std::mutex> lock(taskMutex_);
@@ -296,15 +255,20 @@ void TaskImpl::_interruptFromParent()
 
 	service_._setCurrentTask(KEY, parent_);
 
+	const auto interruptedCb = std::move(interruptedCb_);
+	const auto finishedCb = std::move(finishedCb_);
+
 	lock.unlock();
 
-	if (interruptedCb_)
-		interruptedCb_();
-
-	if (finishedCb_)
-		finishedCb_();
-
 	destroy();
+
+	// Further don't use 'this'.
+
+	if (interruptedCb)
+		interruptedCb->exec();
+
+	if (finishedCb)
+		finishedCb->exec();
 }
 
 void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
@@ -331,18 +295,18 @@ void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
 	if (_isInterrupted)
 	{
 		if (interruptedCb)
-			interruptedCb();
+			interruptedCb->exec();
 		else if (parent)
 			parent->interrupt();
 	}
 	else
 	{
 		if (succeededCb)
-			succeededCb();
+			succeededCb->exec();
 	}
 
 	if (finishedCb)
-		finishedCb();
+		finishedCb->exec();
 
 	if (mutex)
 		mutex->_taskFinished(KEY);
@@ -394,24 +358,6 @@ TaskP Task::_create(AccessKey<Service, Mutex>, Service& service, TaskImpl* paren
 TaskImpl& Task::_impl(AccessKey<Service, Mutex>)
 {
 	return impl_;
-}
-
-Task& Task::succeeded(TaskSucceededCallback succeeded)
-{
-	impl_.succeeded(std::move(succeeded));
-	return *this;
-}
-
-Task& Task::interrupted(TaskInterruptedCallback interrupted)
-{
-	impl_.interrupted(std::move(interrupted));
-	return *this;
-}
-
-Task& Task::finished(TaskFinishedCallback finished)
-{
-	impl_.finished(std::move(finished));
-	return *this;
 }
 
 TaskP Task::start()

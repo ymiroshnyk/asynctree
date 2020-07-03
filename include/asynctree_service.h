@@ -64,6 +64,8 @@ public:
 	void _setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task);
 
 private:
+	
+
 	uint _syncWorkersQueue();
 	void _moveTaskToWorkers(EnumTaskWeight weight);
 	void _workerFunc();
