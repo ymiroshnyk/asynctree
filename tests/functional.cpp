@@ -196,7 +196,7 @@ TEST_F(Functional, StartTaskFromCallback)
 	EXPECT_EQ(sequence, std::vector<int>({ 0, 1, 2, 3, 4 }));
 }
 
-TEST_F(Functional, OneMillionTasks)
+TEST_F(Functional, 100KTasks)
 {
 	std::atomic<int> counter(0);
 
@@ -217,13 +217,7 @@ TEST_F(Functional, OneMillionTasks)
 									for (int e = 0; e < 10; ++e)
 									{
 										service_->task(ast::Light, [&] {
-											for (int f = 0; f < 100; ++f)
-											{
-												service_->task(ast::Light, [&] {
-													counter.fetch_add(1);
-												})
-												.start();
-											}
+											counter.fetch_add(1);
 										})
 										.start();
 									}
@@ -241,5 +235,32 @@ TEST_F(Functional, OneMillionTasks)
 	}
 
 	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(counter.load(), 1000000);
+	EXPECT_EQ(counter.load(), 100000);
+}
+
+TEST_F(Functional, TaskDeletedOnCallback)
+{
+	ast::TaskW parent, child;
+	bool parentDeleted = false;
+	bool childDeleted = false;
+
+	parent = service_->task(ast::Light, [&]() {
+		child = service_->task(ast::Light, [&]() {})
+		.succeeded([&]() {
+			childDeleted = !(bool)child.lock();
+		})
+		.shared_from_this();
+
+		child.lock()->start();
+	})
+	.succeeded([&]() mutable {
+		parentDeleted = !(bool)parent.lock();
+	})
+	.shared_from_this();
+
+	parent.lock()->start();
+
+	service_->waitUtilEverythingIsDone();
+	EXPECT_EQ(parentDeleted, true);
+	EXPECT_EQ(childDeleted, true);
 }

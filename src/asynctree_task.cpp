@@ -320,33 +320,42 @@ void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
 
 	service_._setCurrentTask(KEY, parent_);
 
+	const auto _isInterrupted = isInterrupted();
+	const auto parent = parent_;
+	const auto interruptedCb = std::move(interruptedCb_);
+	const auto succeededCb = std::move(succeededCb_);
+	const auto finishedCb = std::move(finishedCb_);
+	const auto mutex = mutex_;
+
 	lock.unlock();
 
-	if (isInterrupted())
+	destroy();
+
+	// Further don't use 'this'.
+
+	if (_isInterrupted)
 	{
-		if (interruptedCb_)
-			interruptedCb_();
-		else if (parent_)
-			parent_->interrupt();
+		if (interruptedCb)
+			interruptedCb();
+		else if (parent)
+			parent->interrupt();
 	}
 	else
 	{
-		if (succeededCb_)
-			succeededCb_();
+		if (succeededCb)
+			succeededCb();
 	}
 
-	if (finishedCb_)
-		finishedCb_();
+	if (finishedCb)
+		finishedCb();
 
-	if (mutex_)
-		mutex_->_taskFinished(KEY);
+	if (mutex)
+		mutex->_taskFinished(KEY);
 
-	if (parent_)
+	if (parent)
 	{
-		parent_->_notifyChildFinished();
+		parent->_notifyChildFinished();
 	}
-
-	destroy();
 }
 
 void TaskImpl::_notifyChildFinished()
