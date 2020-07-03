@@ -13,7 +13,7 @@ protected:
 
 	void SetUp() override
 	{
-		service_ = std::make_unique<ast::Service>(4);
+		service_ = std::make_unique<ast::Service>();
 	}
 
 	void TearDown() override
@@ -27,8 +27,8 @@ TEST_F(Functional, TaskFuncIsCalledOnlyOnce)
 {
 	int numCalls = 0;
 	service_->task(ast::Light, [&]() {
-		++numCalls;
-	}).start();
+			++numCalls;
+		}).start();
 
 	service_->waitUtilEverythingIsDone();
 	EXPECT_EQ(numCalls, 1);
@@ -40,11 +40,11 @@ TEST_F(Functional, OnSuccess)
 	int finished = 0;
 	int interrupted = 0;
 
-	service_->task(ast::Light, [&]() {})
-		.succeeded([&]() { ++succeeded;  })
-		.finished([&]() { ++finished;  })
-		.interrupted([&]() { ++interrupted;  })
-		.start();
+	service_->task(ast::Light, [&]() {}
+		, ast::succeeded([&]() { ++succeeded;  })
+		, ast::finished([&]() { ++finished;  })
+		, ast::interrupted([&]() { ++interrupted;  })
+		).start();
 
 	service_->waitUtilEverythingIsDone();
 	EXPECT_EQ(succeeded, 1);
@@ -64,15 +64,16 @@ TEST_F(Functional, OnInterruptTask)
 	std::promise<bool> onInterrupted;
 	auto onInterruptedFuture = onInterrupted.get_future();
 
-	auto task = service_->task(ast::Light, [&]() {
-		onSucceeded.set_value(true);
-		onInterruptedFuture.wait();
-		isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
-	})
-	.succeeded([&]() { ++succeeded; })
-	.finished([&]() { ++finished;  })
-	.interrupted([&]() { ++interrupted;  })
-	.start();
+	auto task = service_->task(ast::Light, 
+		[&]() {
+			onSucceeded.set_value(true);
+			onInterruptedFuture.wait();
+			isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
+		}
+		, ast::succeeded([&]() { ++succeeded; })
+		, ast::finished([&]() { ++finished;  })
+		, ast::interrupted([&]() { ++interrupted;  })
+		).start();
 
 	onSucceededFuture.wait();
 	task->interrupt();
@@ -98,18 +99,20 @@ TEST_F(Functional, OnInterruptParentTask)
 	std::promise<bool> onInterrupted;
 	auto onInterruptedFuture = onInterrupted.get_future();
 
-	auto task = service_->task(ast::Light, [&]() {
-		auto childTask = service_->task(ast::Light, [&]() {
-			onSucceeded.set_value(true);
-			onInterruptedFuture.wait();
-			isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
+	auto task = service_->task(ast::Light, 
+		[&]() {
+			auto childTask = service_->task(ast::Light, 
+				[&]() {
+					onSucceeded.set_value(true);
+					onInterruptedFuture.wait();
+					isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
+				}
+				, ast::succeeded([&]() { ++succeeded; })
+				, ast::finished([&]() { ++finished;  })
+				, ast::interrupted([&]() { ++interrupted;  })
+				).start();
 		})
-		.succeeded([&]() { ++succeeded; })
-		.finished([&]() { ++finished;  })
-		.interrupted([&]() { ++interrupted;  })
 		.start();
-	})
-	.start();
 
 	onSucceededFuture.wait();
 	task->interrupt();
@@ -138,25 +141,27 @@ TEST_F(Functional, OnInterruptChildTask)
 	std::promise<bool> onInterrupted;
 	auto onInterruptedFuture = onInterrupted.get_future();
 
-	auto task = service_->task(ast::Light, [&]() {
-		auto childTask = service_->task(ast::Light, [&]() {
-			onSucceeded.set_value(true);
-			onInterruptedFuture.wait();
-			isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
-		})
-		.succeeded([&]() { ++childSucceeded; })
-		.finished([&]() { ++childFinished;  })
-		.interrupted([&]() { ++childInterrupted;  })
-		.start();
+	auto task = service_->task(ast::Light, 
+		[&]() {
+			auto childTask = service_->task(ast::Light, 
+				[&]() {
+					onSucceeded.set_value(true);
+					onInterruptedFuture.wait();
+					isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
+				},
+				ast::succeeded([&]() { ++childSucceeded; }),
+				ast::finished([&]() { ++childFinished; }),
+				ast::interrupted([&]() { ++childInterrupted; })
+				).start();
 
-		onSucceededFuture.wait();
-		childTask->interrupt();
-		onInterrupted.set_value(true);
-	})
-	.succeeded([&]() { ++parentSucceeded; })
-	.finished([&]() { ++parentFinished;  })
-	.interrupted([&]() { ++parentInterrupted;  })
-	.start();
+			onSucceededFuture.wait();
+			childTask->interrupt();
+			onInterrupted.set_value(true);
+		}
+		, ast::succeeded([&]() { ++parentSucceeded; })
+		, ast::finished([&]() { ++parentFinished;  })
+		, ast::interrupted([&]() { ++parentInterrupted;  })
+		).start();
 
 	service_->waitUtilEverythingIsDone();
 	EXPECT_EQ(childSucceeded, 0);
@@ -173,24 +178,27 @@ TEST_F(Functional, StartTaskFromCallback)
 {
 	std::vector<int> sequence;
 
-	auto task = service_->task(ast::Light, [&]() {
-		sequence.push_back(0);
-	})
-	.succeeded([&]() {
-		service_->task(ast::Light, [&]() {
-			sequence.push_back(1);
+	auto task = service_->task(ast::Light, 
+		[&]() {
+			sequence.push_back(0);
+		}
+		, ast::succeeded([&]() {
+			service_->task(ast::Light, 
+				[&]() {
+					sequence.push_back(1);
+				}
+				, ast::finished([&]() {
+					service_->task(ast::Light, 
+						[&]() {
+							sequence.push_back(2);
+						}
+						, ast::succeeded([&]() { sequence.push_back(3); })
+						, ast::finished([&]() { sequence.push_back(4); })
+						).start();
+				})
+				).start();
 		})
-		.finished([&]() {
-			service_->task(ast::Light, [&]() {
-				sequence.push_back(2);
-			})
-			.succeeded([&]() { sequence.push_back(3); })
-			.finished([&]() { sequence.push_back(4); })
-			.start();
-		})
-		.start();
-	})
-	.start();
+		).start();
 
 	service_->waitUtilEverythingIsDone();
 	EXPECT_EQ(sequence, std::vector<int>({ 0, 1, 2, 3, 4 }));
@@ -269,70 +277,44 @@ TEST_F(Functional, Stress_10MTasksWithCallback)
 											{
 												service_->task(ast::Light, [&] {
 													counter.fetch_add(1);
-												})
-												.succeeded([&] {})
-												.interrupted([&] {})
-												.finished([&] {})
-												.start();
+												}
+												, ast::succeeded([&] {})
+												, ast::interrupted([&] {})
+												, ast::finished([&] {})
+												).start();
 											}
-										})
-										.succeeded([&] {})
-										.interrupted([&] {})
-										.finished([&] {})
-										.start();
+										}
+										, ast::succeeded([&] {})
+										, ast::interrupted([&] {})
+										, ast::finished([&] {})
+										).start();
 									}
-								})
-								.succeeded([&] {})
-								.interrupted([&] {})
-								.finished([&] {})
-								.start();
+								}
+								, ast::succeeded([&] {})
+								, ast::interrupted([&] {})
+								, ast::finished([&] {})
+								).start();
 							}
-						})
-						.succeeded([&] {})
-						.interrupted([&] {})
-						.finished([&] {})
-						.start();
+						}
+						, ast::succeeded([&] {})
+						, ast::interrupted([&] {})
+						, ast::finished([&] {})
+						).start();
 					}
-				})
-				.succeeded([&] {})
-				.interrupted([&] {})
-				.finished([&] {})
-				.start();
+				}
+				, ast::succeeded([&] {})
+				, ast::interrupted([&] {})
+				, ast::finished([&] {})
+				).start();
 			}
-		})
-		.succeeded([&] {})
-		.interrupted([&] {})
-		.finished([&] {})
-		.start();
+		}
+		, ast::succeeded([&] {})
+		, ast::interrupted([&] {})
+		, ast::finished([&] {})
+		).start();
 	}
 
 	service_->waitUtilEverythingIsDone();
 	EXPECT_EQ(counter.load(), 10000000);
 }
 
-TEST_F(Functional, TaskDeletedOnCallback)
-{
-	ast::TaskW parent, child;
-	bool parentDeleted = false;
-	bool childDeleted = false;
-
-	parent = service_->task(ast::Light, [&]() {
-		child = service_->task(ast::Light, [&]() {})
-		.succeeded([&]() {
-			childDeleted = !(bool)child.lock();
-		})
-		.shared_from_this();
-
-		child.lock()->start();
-	})
-	.succeeded([&]() mutable {
-		parentDeleted = !(bool)parent.lock();
-	})
-	.shared_from_this();
-
-	parent.lock()->start();
-
-	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(parentDeleted, true);
-	EXPECT_EQ(childDeleted, true);
-}

@@ -58,25 +58,6 @@ Service::~Service()
 	}
 }
 
-Task& Service::task(EnumTaskWeight weight, TaskWorkFunc workFunc)
-{
-	if (currentTask_)
-		return childTask(weight, std::move(workFunc));
-	else
-		return topmostTask(weight, std::move(workFunc));
-}
-
-Task& Service::topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
-{
-	return *Task::_create(KEY, *this, nullptr, weight, std::move(workFunc));
-}
-
-Task& Service::childTask(EnumTaskWeight weight, TaskWorkFunc workFunc)
-{
-	assert(currentTask_);
-	return *Task::_create(KEY, *this, currentTask_, weight, std::move(workFunc));
-}
-
 void Service::_startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl)
 {
 	if (auto parentTask = taskImpl.parent())

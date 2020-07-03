@@ -3,13 +3,10 @@
 #include "asynctree_config.h"
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
+#include "asynctree_callback.h"
 
 namespace ast
 {
-
-typedef std::function<void()> TaskSucceededCallback;
-typedef std::function<void()> TaskInterruptedCallback;
-typedef std::function<void()> TaskFinishedCallback;
 
 class Service;
 class Mutex;
@@ -39,9 +36,6 @@ private:
 	TaskImpl* parent_;
 
 	TaskWorkFunc workFunc_;
-	std::unique_ptr<VoidFunc> succeededCb_;
-	std::unique_ptr<VoidFunc> interruptedCb_;
-	std::unique_ptr<VoidFunc> finishedCb_;
 
 	std::mutex taskMutex_;
 
@@ -72,9 +66,6 @@ public:
 	void notifyDeferredTask();
 	void addDeferredTask(EnumTaskWeight weight, TaskImpl& child);
 
-	void succeeded(std::unique_ptr<VoidFunc> succeeded);
-	void interrupted(std::unique_ptr<VoidFunc> interrupted);
-	void finished(std::unique_ptr<VoidFunc> finished);
 	void start();
 
 	void interrupt();
@@ -95,13 +86,10 @@ class Task : public std::enable_shared_from_this<Task>
 	TaskImpl impl_;
 	TaskP selfLock_;
 
-	struct Private {};
 public:
-	Task(Private, Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
 	~Task();
 
-	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent, 
-		EnumTaskWeight weight, TaskWorkFunc workFunc);
 	TaskImpl& _impl(AccessKey<Service, Mutex>);
 
 	template <typename TFunc>
@@ -132,6 +120,61 @@ public:
 
 	void interrupt();
 	bool isInterrupted() const;
+
+protected:
+	void setSelfLock(TaskP selfLock);
+
+private:
+	virtual void _execCallback(CallbackType type) = 0;
+};
+
+
+template <typename T1, typename T2, typename T3>
+class TaskTyped : public Task
+{
+	T1 t1_;
+	T2 t2_;
+	T3 t3_;
+
+public:
+	TaskTyped(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc,
+		T1 t1, T2 t2, T3 t3)
+		: Task(service, parent, weight, std::move(workFunc))
+		, t1_(std::move(t1))
+		, t2_(std::move(t2))
+		, t3_(std::move(t3))
+	{
+	}
+
+	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent,
+		EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+	{
+		auto task = std::make_shared<TaskTyped<T1, T2, T3>>(service, parent, weight, std::move(workFunc),
+			std::move(t1), std::move(t2), std::move(t3));
+		task->setSelfLock(task);
+		return task;
+	}
+
+	void _execCallback(CallbackType type) override
+	{
+		if (t1_.type_ == type)
+		{
+			t1_.func_();
+			return;
+		}
+
+		if (t2_.type_ == type)
+		{
+			t2_.func_();
+			return;
+		}
+
+		if (t3_.type_ == type)
+		{
+			t3_.func_();
+			return;
+		}
+	}
 };
 
 }

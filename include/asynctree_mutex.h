@@ -28,24 +28,65 @@ public:
 	Mutex(Service& service);
 	~Mutex();
 
-	Task& rootTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& childTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
-
-	Task& sharedRootTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& sharedTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& sharedChildTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	template <typename T1, typename T2, typename T3>
+	Task& rootTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3);
+	template <typename T1, typename T2, typename T3>
+	Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3);
+	template <typename T1, typename T2, typename T3>
+	Task& sharedRootTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3);
+	template <typename T1, typename T2, typename T3>
+	Task& sharedTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3);
 
 	void _startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl);
 	void _taskFinished(AccessKey<TaskImpl>);
 
 private:
-	TaskP _rootTask(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc);
-	TaskP _task(bool shared, EnumTaskWeight weight, TaskWorkFunc workFunc);
-	TaskP _childTask(bool shared, Task* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
+	template <typename T1, typename T2, typename T3>
+	TaskP _task(bool shared, EnumTaskWeight weight, Task* parent, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3);
+
 	bool _checkIfTaskCanBeStartedAndIncCounters(bool shared);
 	void _queueTask(TaskImpl& task);
 	bool _checkIfTaskCanBeStartedFromQueueAndStart();
 };
+
+template <typename T1, typename T2, typename T3>
+Task& Mutex::rootTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return _task(false, weight, nullptr, std::move(workFunc), 
+		std::move(t1), std::move(t2), std::move(t3))
+}
+
+template <typename T1, typename T2, typename T3>
+Task& Mutex::task(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return _task(false, weight, Service::currentTask(), std::move(workFunc),
+		std::move(t1), std::move(t2), std::move(t3))
+}
+
+template <typename T1, typename T2, typename T3>
+Task& Mutex::sharedRootTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return _task(true, weight, nullptr, std::move(workFunc),
+		std::move(t1), std::move(t2), std::move(t3))
+}
+
+template <typename T1, typename T2, typename T3>
+Task& Mutex::sharedTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return _task(true, weight, Service::currentTask(), std::move(workFunc),
+		std::move(t1), std::move(t2), std::move(t3))
+}
+
+template <typename T1, typename T2, typename T3>
+TaskP Mutex::_task(bool shared, EnumTaskWeight weight, Task* parent, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	auto task = TaskTyped<T1, T2, T3>::_create(KEY, service_, 
+		parent ? &parent->_impl(KEY) : nullptr, weight, std::move(workFunc), std::move(t1),
+		std::move(t2), std::move(t3));
+	auto& taskImpl = task->_impl(KEY);
+	taskImpl.shared_ = shared;
+	taskImpl.mutex_ = this;
+	return task;
+}
 
 }

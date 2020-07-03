@@ -52,9 +52,13 @@ public:
 	Service(const uint numThreads = std::thread::hardware_concurrency());
 	~Service();
 
-	Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
-	Task& childTask(EnumTaskWeight weight, TaskWorkFunc workFunc);
+	template <typename T1 = Callback<void>, typename T2 = Callback<void>, typename T3 = Callback<void>>
+	inline Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc,
+		T1 t1 = T1(), T2 t2 = T2(), T3 t3 = T3());
+
+	template <typename T1 = Callback<void>, typename T2 = Callback<void>, typename T3 = Callback<void>>
+	inline Task& topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc,
+		T1 t1 = T1(), T2 t2 = T2(), T3 t3 = T3());
 
 	void waitUtilEverythingIsDone();
 	static Task* currentTask();
@@ -64,11 +68,21 @@ public:
 	void _setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task);
 
 private:
-	
-
 	uint _syncWorkersQueue();
 	void _moveTaskToWorkers(EnumTaskWeight weight);
 	void _workerFunc();
 };
+
+template <typename T1, typename T2, typename T3>
+inline Task& Service::task(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return *TaskTyped<T1, T2, T3>::_create(KEY, *this, currentTask_, weight, std::move(workFunc), std::move(t1), std::move(t2), std::move(t3));
+}
+
+template <typename T1, typename T2, typename T3>
+inline Task& Service::topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
+{
+	return *TaskTyped<T1, T2, T3>::_create(KEY, *this, nullptr, weight, std::move(workFunc), std::move(t1), std::move(t2), std::move(t3));
+}
 
 }

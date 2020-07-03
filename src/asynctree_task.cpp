@@ -170,21 +170,6 @@ void TaskImpl::addDeferredTask(EnumTaskWeight weight, TaskImpl& child)
 	_addChildTaskNoIncCounter(weight, child, lock);
 }
 
-void TaskImpl::succeeded(std::unique_ptr<VoidFunc> succeeded)
-{
-	succeededCb_ = std::move(succeeded);
-}
-
-void TaskImpl::interrupted(std::unique_ptr<VoidFunc> interrupted)
-{
-	interruptedCb_ = std::move(interrupted);
-}
-
-void TaskImpl::finished(std::unique_ptr<VoidFunc> finished)
-{
-	finishedCb_ = std::move(finished);
-}
-
 void TaskImpl::start()
 {
 	if (mutex_) {
@@ -255,20 +240,12 @@ void TaskImpl::_interruptFromParent()
 
 	service_._setCurrentTask(KEY, parent_);
 
-	const auto interruptedCb = std::move(interruptedCb_);
-	const auto finishedCb = std::move(finishedCb_);
-
 	lock.unlock();
 
+	task_._execCallback(CallbackType::Interrupted);
+	task_._execCallback(CallbackType::Finished);
+
 	destroy();
-
-	// Further don't use 'this'.
-
-	if (interruptedCb)
-		interruptedCb->exec();
-
-	if (finishedCb)
-		finishedCb->exec();
 }
 
 void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
@@ -279,42 +256,24 @@ void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
 
 	service_._setCurrentTask(KEY, parent_);
 
-	const auto _isInterrupted = isInterrupted();
-	const auto parent = parent_;
-	const auto interruptedCb = std::move(interruptedCb_);
-	const auto succeededCb = std::move(succeededCb_);
-	const auto finishedCb = std::move(finishedCb_);
-	const auto mutex = mutex_;
-
 	lock.unlock();
-
-	destroy();
 
 	// Further don't use 'this'.
 
-	if (_isInterrupted)
-	{
-		if (interruptedCb)
-			interruptedCb->exec();
-		else if (parent)
-			parent->interrupt();
-	}
+	if (isInterrupted())
+		task_._execCallback(CallbackType::Interrupted);
 	else
-	{
-		if (succeededCb)
-			succeededCb->exec();
-	}
+		task_._execCallback(CallbackType::Succeeded);
 
-	if (finishedCb)
-		finishedCb->exec();
+	task_._execCallback(CallbackType::Finished);
 
-	if (mutex)
-		mutex->_taskFinished(KEY);
+	if (mutex_)
+		mutex_->_taskFinished(KEY);
 
-	if (parent)
-	{
-		parent->_notifyChildFinished();
-	}
+	if (parent_)
+		parent_->_notifyChildFinished();
+
+	destroy();
 }
 
 void TaskImpl::_notifyChildFinished()
@@ -336,7 +295,7 @@ void TaskImpl::_notifyChildFinished()
 	}
 }
 
-Task::Task(Private, Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc)
+Task::Task(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc)
 : impl_(KEY, *this, service, parent, weight, std::move(workFunc))
 {
 
@@ -345,14 +304,6 @@ Task::Task(Private, Service& service, TaskImpl* parent, EnumTaskWeight weight, T
 Task::~Task()
 {
 	assert(!selfLock_);
-}
-
-TaskP Task::_create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent,
-	EnumTaskWeight weight, TaskWorkFunc workFunc)
-{
-	auto task = std::make_shared<Task>(Private(), service, parent, weight, std::move(workFunc));
-	task->selfLock_ = task;
-	return task;
 }
 
 TaskImpl& Task::_impl(AccessKey<Service, Mutex>)
@@ -374,6 +325,11 @@ void Task::interrupt()
 bool Task::isInterrupted() const
 {
 	return impl_.isInterrupted();
+}
+
+void Task::setSelfLock(TaskP selfLock)
+{
+	selfLock_ = std::move(selfLock);
 }
 
 }
