@@ -20,9 +20,9 @@ class TaskImpl
 public:
 	// hooks and parameters for different queues in service, mutexes and tasks
 	TaskImpl* next_;
-	EnumTaskWeight weight_;
+	EnumTaskWeight weight_ : 2;
 	Mutex* mutex_;
-	bool shared_;
+	uint shared_ : 1;
 
 private:
 	enum State
@@ -47,9 +47,9 @@ private:
 
 	State state_;
 
-	mutable bool interrupted_;
+	mutable uint interrupted_ : 1;
 
-	uint numChildrenToComplete_;
+	uint numChildrenToComplete_ : 20;
 
 	struct WeightBuffer
 	{
