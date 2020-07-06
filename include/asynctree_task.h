@@ -22,12 +22,12 @@ public:
 	uint shared_ : 1;
 
 private:
-	enum State : unsigned char
+	enum class State : unsigned char
 	{
-		S_Created = 0,
-		S_Working,
-		S_WaitForChildren,
-		S_Done,
+		Created = 0,
+		Working,
+		WaitForChildren,
+		Done,
 	};
 
 	Task& task_;
