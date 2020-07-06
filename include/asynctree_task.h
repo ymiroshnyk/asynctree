@@ -17,14 +17,14 @@ class TaskImpl
 public:
 	// hooks and parameters for different queues in service, mutexes and tasks
 	TaskImpl* next_;
-	EnumTaskWeight weight_;
+	EnumTaskWeight weight_ : 2;
 	Mutex* mutex_;
 	uint shared_ : 1;
 
 private:
-	enum State
+	enum State : unsigned char
 	{
-		S_Created,
+		S_Created = 0,
 		S_Working,
 		S_WaitForChildren,
 		S_Done,
@@ -35,11 +35,9 @@ private:
 
 	TaskImpl* parent_;
 
-	TaskWorkFunc workFunc_;
-
 	std::mutex taskMutex_;
 
-	State state_;
+	State state_ : 2;
 
 	mutable uint interrupted_ : 1;
 
@@ -55,7 +53,7 @@ private:
 
 public:
 	TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, 
-		EnumTaskWeight weight, TaskWorkFunc workFunc);
+		EnumTaskWeight weight);
 	~TaskImpl();
 
 	Task& task();
@@ -87,7 +85,7 @@ class Task : public std::enable_shared_from_this<Task>
 	TaskP selfLock_;
 
 public:
-	Task(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc);
+	Task(Service& service, TaskImpl* parent, EnumTaskWeight weight);
 	~Task();
 
 	TaskImpl& _impl(AccessKey<Service, Mutex>);
@@ -125,13 +123,15 @@ protected:
 	void setSelfLock(TaskP selfLock);
 
 private:
+	virtual void _execWorkFunc() = 0;
 	virtual void _execCallback(CallbackType type) = 0;
 };
 
 
-template <typename T1, typename T2, typename T3>
+template <typename TaskWorkFunc, typename T1, typename T2, typename T3>
 class TaskTyped : public Task
 {
+	TaskWorkFunc workFunc_;
 	T1 t1_;
 	T2 t2_;
 	T3 t3_;
@@ -139,7 +139,8 @@ class TaskTyped : public Task
 public:
 	TaskTyped(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc,
 		T1 t1, T2 t2, T3 t3)
-		: Task(service, parent, weight, std::move(workFunc))
+		: Task(service, parent, weight)
+		, workFunc_(std::move(workFunc))
 		, t1_(std::move(t1))
 		, t2_(std::move(t2))
 		, t3_(std::move(t3))
@@ -149,10 +150,15 @@ public:
 	static TaskP _create(AccessKey<Service, Mutex>, Service& service, TaskImpl* parent,
 		EnumTaskWeight weight, TaskWorkFunc workFunc, T1 t1, T2 t2, T3 t3)
 	{
-		auto task = std::make_shared<TaskTyped<T1, T2, T3>>(service, parent, weight, std::move(workFunc),
+		auto task = std::make_shared<TaskTyped<TaskWorkFunc, T1, T2, T3>>(service, parent, weight, std::move(workFunc),
 			std::move(t1), std::move(t2), std::move(t3));
 		task->setSelfLock(task);
 		return task;
+	}
+
+	void _execWorkFunc() override
+	{
+		workFunc_();
 	}
 
 	void _execCallback(CallbackType type) override

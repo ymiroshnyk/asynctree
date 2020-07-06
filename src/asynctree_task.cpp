@@ -13,14 +13,13 @@ namespace
 }
 
 TaskImpl::TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* parent, 
-	EnumTaskWeight weight, TaskWorkFunc workFunc)
+	EnumTaskWeight weight)
 : next_(nullptr)
 , weight_(weight)
 , mutex_(nullptr)
 , task_(task)
 , service_(service)
 , parent_(parent)
-, workFunc_(std::move(workFunc))
 , state_(S_Created)
 , interrupted_(false)
 , numChildrenToComplete_(0)
@@ -99,8 +98,7 @@ void TaskImpl::exec(EnumTaskWeight weight)
 
 		service_._setCurrentTask(KEY, this);
 
-		workFunc_();
-		workFunc_ = TaskWorkFunc();
+		task_._execWorkFunc();
 
 		lock.lock();
 
@@ -295,8 +293,8 @@ void TaskImpl::_notifyChildFinished()
 	}
 }
 
-Task::Task(Service& service, TaskImpl* parent, EnumTaskWeight weight, TaskWorkFunc workFunc)
-: impl_(KEY, *this, service, parent, weight, std::move(workFunc))
+Task::Task(Service& service, TaskImpl* parent, EnumTaskWeight weight)
+: impl_(KEY, *this, service, parent, weight)
 {
 
 }

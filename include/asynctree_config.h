@@ -34,9 +34,7 @@ public:
 	}
 };
 
-typedef std::function<void()> TaskWorkFunc;
-
-enum EnumTaskWeight
+enum EnumTaskWeight : unsigned char
 {
 	Light = 0,
 	Middle,
