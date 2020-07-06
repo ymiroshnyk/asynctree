@@ -13,7 +13,7 @@ protected:
 
 	void SetUp() override
 	{
-		service_ = std::make_unique<ast::Service>();
+		service_ = std::make_unique<ast::Service>(4);
 	}
 
 	void TearDown() override
