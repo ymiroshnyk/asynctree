@@ -37,11 +37,6 @@ TaskImpl::TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* pare
 , interrupted_(false)
 , numChildrenToComplete_(0)
 {
-	for (auto& buffer : weightBuffers_)
-	{
-		buffer.firstChild_ = nullptr;
-		buffer.lastChild_ = nullptr;
-	}
 }
 
 TaskImpl::~TaskImpl()
