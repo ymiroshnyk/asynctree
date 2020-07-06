@@ -1,7 +1,6 @@
 #pragma once
 
 #include "asynctree_config.h"
-#include "asynctree_task_callbacks.h"
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
 
@@ -52,11 +51,11 @@ public:
 	Service(const uint numThreads = std::thread::hardware_concurrency());
 	~Service();
 
-	template <typename TaskWorkFunc, typename T1 = Callback<void>, typename T2 = Callback<void>, typename T3 = Callback<void>>
+	template <typename TaskWorkFunc, typename T1 = StaticCallback<void>, typename T2 = StaticCallback<void>, typename T3 = StaticCallback<void>>
 	inline Task& task(EnumTaskWeight weight, TaskWorkFunc workFunc,
 		T1 t1 = T1(), T2 t2 = T2(), T3 t3 = T3());
 
-	template <typename TaskWorkFunc, typename T1 = Callback<void>, typename T2 = Callback<void>, typename T3 = Callback<void>>
+	template <typename TaskWorkFunc, typename T1 = StaticCallback<void>, typename T2 = StaticCallback<void>, typename T3 = StaticCallback<void>>
 	inline Task& topmostTask(EnumTaskWeight weight, TaskWorkFunc workFunc,
 		T1 t1 = T1(), T2 t2 = T2(), T3 t3 = T3());
 

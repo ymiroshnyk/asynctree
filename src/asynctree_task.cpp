@@ -330,5 +330,15 @@ void Task::setSelfLock(TaskP selfLock)
 	selfLock_ = std::move(selfLock);
 }
 
+void Task::_execCallback(CallbackType type)
+{
+	switch (type)
+	{
+	case CallbackType::Succeeded: if (succeededCb_) succeededCb_->exec(); break;
+	case CallbackType::Interrupted: if (interruptedCb_) interruptedCb_->exec(); break;
+	case CallbackType::Finished: if (finishedCb_) finishedCb_->exec(); break;
+	}
+}
+
 }
 
