@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <algorithm>
+#include <cassert>
 
 namespace ast
 {

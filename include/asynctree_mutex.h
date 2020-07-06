@@ -4,6 +4,8 @@
 #include "asynctree_task_typedefs.h"
 #include "asynctree_access_key.h"
 
+#include <mutex>
+
 namespace ast
 {
 

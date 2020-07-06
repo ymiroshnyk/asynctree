@@ -5,6 +5,8 @@
 #include "asynctree_access_key.h"
 #include "asynctree_callback.h"
 
+#include <mutex>
+
 namespace ast
 {
 

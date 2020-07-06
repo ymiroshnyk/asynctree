@@ -1,6 +1,9 @@
 #include "asynctree_service.h"
 #include "asynctree_task.h"
 
+#include <cassert>
+#include <cmath>
+
 namespace ast
 {
 

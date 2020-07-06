@@ -1,14 +1,5 @@
 #pragma once
 
-#include <thread>
-#include <condition_variable>
-#include <mutex>
-#include <vector>
-#include <memory>
-#include <functional>
-#include <cassert>
-#include <cmath>
-
 namespace ast
 {
 
