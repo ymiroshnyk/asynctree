@@ -68,7 +68,7 @@ public:
 	static Task* currentTask();
 
 	void _startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl);
-	void _addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task);
+	void _addToQueue(AccessKey<Service, Mutex, TaskImpl>, TaskImpl& task);
 	void _setCurrentTask(AccessKey<TaskImpl>, TaskImpl* task);
 
 private:

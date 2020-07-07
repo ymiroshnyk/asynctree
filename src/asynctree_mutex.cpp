@@ -39,11 +39,11 @@ void Mutex::_startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl)
 
 		if (parentImpl)
 		{
-			parentImpl->addChildTask(taskImpl.weight_, taskImpl);
+			parentImpl->addChildTask(taskImpl);
 		}
 		else
 		{
-			service_._addToQueue(KEY, taskImpl.weight_, taskImpl);
+			service_._addToQueue(KEY, taskImpl);
 		}
 	}
 	else
@@ -121,9 +121,9 @@ bool Mutex::_checkIfTaskCanBeStartedFromQueueAndStart()
 			++numTasksToBeFinished_;
 
 			if (TaskImpl* parent = task->parent())
-				parent->addDeferredTask(task->weight_, *task);
+				parent->addDeferredTask(*task);
 			else
-				service_._addToQueue(KEY, task->weight_, *task);
+				service_._addToQueue(KEY, *task);
 
 			return true;
 		}

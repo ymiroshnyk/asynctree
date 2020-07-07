@@ -65,17 +65,17 @@ void Service::_startTask(AccessKey<TaskImpl>, TaskImpl& taskImpl)
 {
 	if (auto parentTask = taskImpl.parent())
 	{
-		parentTask->addChildTask(taskImpl.weight_, taskImpl);
+		parentTask->addChildTask(taskImpl);
 	}
 	else
 	{
-		_addToQueue(KEY, taskImpl.weight_, taskImpl);
+		_addToQueue(KEY, taskImpl);
 	}
 }
 
-void Service::_addToQueue(AccessKey<Service, Mutex, TaskImpl>, EnumTaskWeight weight, TaskImpl& task)
+void Service::_addToQueue(AccessKey<Service, Mutex, TaskImpl>, TaskImpl& task)
 {
-	auto& queue = queues_[weight];
+	auto& queue = queues_[task.weight()];
 
 	std::unique_lock<std::mutex> lock(mutex_);
 
@@ -239,8 +239,6 @@ void Service::_moveTaskToWorkers(EnumTaskWeight weight)
 
 	++queue.numActiveWorkers_;
 
-	task->weight_ = weight;
-
 	if (lastWorkerTask_)
 	{
 		assert(firstWorkerTask_);
@@ -297,17 +295,19 @@ void Service::_workerFunc()
 			while (--numToNotify > 0)
 				workersCV_.notify_one();
 
-			const EnumTaskWeight weight = task->weight_;
-			task->exec(weight);
+			auto& queue = queues_[task->weight()];
+
+			task->exec();
+			// !task is deleted further
 
 			lock.lock();
 
 			--numWorkingTasks_;
 			assert(numWorkingTasks_ != (uint)-1);
-			--queues_[weight].numActiveWorkers_;
-			assert(queues_[weight].numActiveWorkers_ != (uint)-1);
+			--queue.numActiveWorkers_;
+			assert(queue.numActiveWorkers_ != (uint)-1);
 #ifdef ASYNCTREE_DEBUG
-			++queues_[weight].numTasksFinished_;
+			++queue.numTasksFinished_;
 #endif
 		}
 	}

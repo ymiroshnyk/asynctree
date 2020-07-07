@@ -19,7 +19,6 @@ class TaskImpl
 public:
 	// hooks and parameters for different queues in service, mutexes and tasks
 	TaskImpl* next_;
-	EnumTaskWeight weight_ : 2;
 	Mutex* mutex_;
 	uint shared_ : 1;
 
@@ -34,8 +33,8 @@ private:
 
 	Task& task_;
 	Service& service_;
-
-	TaskImpl* parent_;
+	TaskImpl* const parent_;
+	const EnumTaskWeight weight_ : 2;
 
 	std::mutex taskMutex_;
 
@@ -58,13 +57,14 @@ public:
 		EnumTaskWeight weight);
 	~TaskImpl();
 
-	Task& task();
-	TaskImpl* parent();
-	void exec(EnumTaskWeight weight);
+	Task& task() { return task_; }
+	TaskImpl* parent() { return parent_; }
+	EnumTaskWeight weight() const { return weight_; }
+	void exec();
 	void destroy();
-	void addChildTask(EnumTaskWeight weight, TaskImpl& child);
+	void addChildTask(TaskImpl& child);
 	void notifyDeferredTask();
-	void addDeferredTask(EnumTaskWeight weight, TaskImpl& child);
+	void addDeferredTask(TaskImpl& child);
 
 	void start();
 
@@ -72,11 +72,12 @@ public:
 	bool isInterrupted() const;
 
 private:
-	void _addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child, std::unique_lock<std::mutex>& lock);
-	void _interruptFromParent();
-
+	void _addChildTaskNoIncCounter(TaskImpl& child, std::unique_lock<std::mutex>& lock);
+	void _interruptWaitingTaskFromParent();
 	void _onFinished(std::unique_lock<std::mutex>& lock);
-	void _notifyChildFinished();
+
+	void _onChildExec(EnumTaskWeight weight);
+	void _onChildFinished();
 };
 
 class Task : public std::enable_shared_from_this<Task>

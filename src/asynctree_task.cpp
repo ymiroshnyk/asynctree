@@ -29,117 +29,37 @@ TaskImpl::TaskImpl(AccessKey<Task>, Task& task, Service& service, TaskImpl* pare
 
 TaskImpl::~TaskImpl()
 {
-	/*{
-		// wait if any mutex lock was waiting before deleting
-		std::lock_guard<std::mutex> lock(taskMutex_);
-	}*/
 }
 
-Task& TaskImpl::task()
+void TaskImpl::exec()
 {
-	return task_;
-}
+	if (parent_)
+		parent_->_onChildExec(weight_);
 
-TaskImpl* TaskImpl::parent()
-{
-	return parent_;
-}
-
-void TaskImpl::exec(EnumTaskWeight weight)
-{
 	std::unique_lock<std::mutex> lock(taskMutex_);
 
-	assert(state_ != State::Done);
+	assert(state_ == State::Created);
 
 	if (isInterrupted())
 	{
-		switch (state_)
-		{
-		case State::Created:
-		{
-			_onFinished(lock);
-			return;
-		}
-
-		case State::Working:
-			// we will not start child task when parent is working and interrupted
-			return;
-
-		default: assert(state_ == State::WaitForChildren);
-		{
-			// interrupt not started tasks
-			for (auto &buf : weightBuffers_)
-			{
-				for (TaskImpl* task = buf.firstChild_; task != nullptr;)
-				{
-					// cache next task, because task will be deleted
-					TaskImpl* nextTask = task->next_;
-					task->_interruptFromParent();
-					task = nextTask;
-
-					--numChildrenToComplete_;
-				}
-
-				buf.firstChild_ = buf.lastChild_ = nullptr;
-			}
-
-			if (numChildrenToComplete_ == 0)
-			{
-				_onFinished(lock);
-			}
-			return;
-		}
-		}
+		_onFinished(lock);
+		return;
 	}
 
-	if (state_ == State::Created)
+	state_ = State::Working;
+	lock.unlock();
+
+	service_._setCurrentTask(KEY, this);
+
+	task_._execWorkFunc();
+
+	lock.lock();
+
+	state_ = State::WaitForChildren;
+
+	if (numChildrenToComplete_ == 0)
 	{
-		state_ = State::Working;
-		lock.unlock();
-
-		service_._setCurrentTask(KEY, this);
-
-		task_._execWorkFunc();
-
-		lock.lock();
-
-		state_ = State::WaitForChildren;
-
-		if (numChildrenToComplete_ == 0)
-		{
-			_onFinished(lock);
-		}
-	}
-	else
-	{
-		auto& buf = weightBuffers_[weight];
-
-		assert(buf.firstChild_);
-		assert(buf.lastChild_);
-
-		TaskImpl& task = *buf.firstChild_;
-		bool addToQueue;
-
-		if (buf.firstChild_->next_)
-		{
-			buf.firstChild_ = buf.firstChild_->next_;
-
-			addToQueue = true;
-		}
-		else
-		{
-			buf.firstChild_ = buf.lastChild_ = nullptr;
-
-			addToQueue = false;
-		}
-
-		assert(task.state_ == State::Created);
-		lock.unlock();
-
-		if (addToQueue)
-			service_._addToQueue(KEY, weight, *this);
-
-		task.exec(weight);
+		_onFinished(lock);
 	}
 }
 
@@ -148,12 +68,12 @@ void TaskImpl::destroy()
 	task_.selfLock_.reset();
 }
 
-void TaskImpl::addChildTask(EnumTaskWeight weight, TaskImpl& child)
+void TaskImpl::addChildTask(TaskImpl& child)
 {
 	std::unique_lock<std::mutex> lock(taskMutex_);
 
 	++numChildrenToComplete_;
-	_addChildTaskNoIncCounter(weight, child, lock);
+	_addChildTaskNoIncCounter(child, lock);
 }
 
 void TaskImpl::notifyDeferredTask()
@@ -163,10 +83,10 @@ void TaskImpl::notifyDeferredTask()
 	++numChildrenToComplete_;
 }
 
-void TaskImpl::addDeferredTask(EnumTaskWeight weight, TaskImpl& child)
+void TaskImpl::addDeferredTask(TaskImpl& child)
 {
 	std::unique_lock<std::mutex> lock(taskMutex_);
-	_addChildTaskNoIncCounter(weight, child, lock);
+	_addChildTaskNoIncCounter(child, lock);
 }
 
 void TaskImpl::start()
@@ -199,14 +119,19 @@ bool TaskImpl::isInterrupted() const
 	return false;
 }
 
-void TaskImpl::_addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child, std::unique_lock<std::mutex>& lock)
+void TaskImpl::_addChildTaskNoIncCounter(TaskImpl& child, std::unique_lock<std::mutex>& lock)
 {
 	assert(state_ == State::Working || state_ == State::WaitForChildren);
 	assert(child.next_ == nullptr);
 
-	auto& buf = weightBuffers_[weight];
+	auto& buf = weightBuffers_[child.weight()];
 
-	const bool addToQueue = !buf.firstChild_;
+	if (!buf.firstChild_)
+	{
+		lock.unlock();
+		service_._addToQueue(KEY, child);
+		return;
+	}
 
 	if (buf.lastChild_)
 	{
@@ -221,16 +146,9 @@ void TaskImpl::_addChildTaskNoIncCounter(EnumTaskWeight weight, TaskImpl& child,
 	}
 
 	buf.lastChild_ = &child;
-
-	lock.unlock();
-
-	if (addToQueue)
-	{
-		service_._addToQueue(KEY, weight, *this);
-	}
 }
 
-void TaskImpl::_interruptFromParent()
+void TaskImpl::_interruptWaitingTaskFromParent()
 {
 	std::unique_lock<std::mutex> lock(taskMutex_);
 	assert(state_ == State::Created);
@@ -257,8 +175,6 @@ void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
 
 	lock.unlock();
 
-	// Further don't use 'this'.
-
 	if (isInterrupted())
 		task_._execCallback(CallbackType::Interrupted);
 	else
@@ -270,12 +186,59 @@ void TaskImpl::_onFinished(std::unique_lock<std::mutex>& lock)
 		mutex_->_taskFinished(KEY);
 
 	if (parent_)
-		parent_->_notifyChildFinished();
+		parent_->_onChildFinished();
 
 	destroy();
 }
 
-void TaskImpl::_notifyChildFinished()
+void TaskImpl::_onChildExec(EnumTaskWeight weight)
+{
+	std::unique_lock<std::mutex> lock(taskMutex_);
+
+	if (isInterrupted())
+	{
+		for (auto& buf : weightBuffers_)
+		{
+			for (TaskImpl* task = buf.firstChild_; task != nullptr;)
+			{
+				// cache next task, because task will be deleted
+				TaskImpl* nextTask = task->next_;
+				task->_interruptWaitingTaskFromParent();
+				task = nextTask;
+
+				--numChildrenToComplete_;
+			}
+
+			buf.firstChild_ = buf.lastChild_ = nullptr;
+		}
+
+		// We have at least one task executing
+		assert(numChildrenToComplete_ > 0);
+
+		return;
+	}
+
+	auto& buf = weightBuffers_[weight];
+
+	if (!buf.firstChild_) return;
+
+	TaskImpl& task = *buf.firstChild_;
+
+	if (buf.firstChild_->next_)
+	{
+		buf.firstChild_ = buf.firstChild_->next_;
+	}
+	else
+	{
+		buf.firstChild_ = buf.lastChild_ = nullptr;
+	}
+
+	lock.unlock();
+
+	service_._addToQueue(KEY, task);
+}
+
+void TaskImpl::_onChildFinished()
 {
 	std::unique_lock<std::mutex> lock(taskMutex_);
 
