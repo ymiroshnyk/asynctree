@@ -7,9 +7,6 @@
 
 typedef unsigned int uint;
 
-class Task;
-
-
 class MainWindow : public QWidget
 {
 	Q_OBJECT
@@ -53,9 +50,4 @@ private:
 	void blurPixel(uint x, uint y, bool hor);
 	void blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect, bool hor);
 	ast::Task& blurImageA(bool horizontal);
-
-public slots :
-	
-
-signals:
 };
