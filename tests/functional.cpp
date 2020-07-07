@@ -217,7 +217,13 @@ TEST_F(AsyncTreeFunctional, Stress_100KTasks)
 									for (int e = 0; e < 10; ++e)
 									{
 										service_->task(ast::Light, [&] {
-											counter.fetch_add(1);
+											for (int f = 0; f < 100; ++f)
+											{
+												service_->task(ast::Light, [&] {
+													counter.fetch_add(1);
+												})
+												.start();
+											}
 										})
 										.start();
 									}
@@ -235,7 +241,7 @@ TEST_F(AsyncTreeFunctional, Stress_100KTasks)
 	}
 
 	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(counter.load(), 100000);
+	EXPECT_EQ(counter.load(), 10000000);
 }
 
 TEST_F(AsyncTreeFunctional, Stress_10KTasksWithStaticCallbacks)
@@ -262,17 +268,26 @@ TEST_F(AsyncTreeFunctional, Stress_10KTasksWithStaticCallbacks)
 									for (int e = 0; e < 10; ++e)
 									{
 										service_->task(ast::Light, [&] {
-											counter.fetch_add(1);
+											for (int f = 0; f < 100; ++f)
+											{
+												service_->task(ast::Light, [&] {
+													counter.fetch_add(1);
+												}
+												, ast::succeeded([&] {
+													numSucceeded.fetch_add(1);
+												})
+												, ast::interrupted([&] {
+													numInterrupted.fetch_add(1);
+												})
+												, ast::finished([&] {
+													numFinished.fetch_add(1);
+												})
+												).start();
+											}
 										}
-										, ast::succeeded([&] {
-											numSucceeded.fetch_add(1);
-										})
-										, ast::interrupted([&] {
-											numInterrupted.fetch_add(1);
-										})
-										, ast::finished([&] {
-											numFinished.fetch_add(1);
-										})
+										, ast::succeeded([&] {})
+										, ast::interrupted([&] {})
+										, ast::finished([&] {})
 										).start();
 									}
 								}
@@ -301,10 +316,10 @@ TEST_F(AsyncTreeFunctional, Stress_10KTasksWithStaticCallbacks)
 	}
 
 	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(counter.load(), 100000);
-	EXPECT_EQ(numSucceeded.load(), 100000);
+	EXPECT_EQ(counter.load(), 10000000);
+	EXPECT_EQ(numSucceeded.load(), 10000000);
 	EXPECT_EQ(numInterrupted.load(), 0);
-	EXPECT_EQ(numFinished.load(), 100000);
+	EXPECT_EQ(numFinished.load(), 10000000);
 }
 
 TEST_F(AsyncTreeFunctional, Stress_10KTasksWithDynamicCallbacks)
@@ -331,17 +346,26 @@ TEST_F(AsyncTreeFunctional, Stress_10KTasksWithDynamicCallbacks)
 									for (int e = 0; e < 10; ++e)
 									{
 										service_->task(ast::Light, [&] {
-											counter.fetch_add(1);
+											for (int e = 0; e < 100; ++e)
+											{
+												service_->task(ast::Light, [&] {
+													counter.fetch_add(1);
+												})
+												.succeeded([&] {
+													numSucceeded.fetch_add(1);
+												})
+												.interrupted([&] {
+													numInterrupted.fetch_add(1);
+												})
+												.finished([&] {
+													numFinished.fetch_add(1);
+												})
+												.start();
+											}
 										})
-										.succeeded([&] {
-											numSucceeded.fetch_add(1);
-										})
-										.interrupted([&] {
-											numInterrupted.fetch_add(1);
-										})
-										.finished([&] {
-											numFinished.fetch_add(1);
-										})
+										.succeeded([&] {})
+										.interrupted([&] {})
+										.finished([&] {})
 										.start();
 									}
 								})
@@ -370,9 +394,9 @@ TEST_F(AsyncTreeFunctional, Stress_10KTasksWithDynamicCallbacks)
 	}
 
 	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(counter.load(), 100000);
-	EXPECT_EQ(numSucceeded.load(), 100000);
+	EXPECT_EQ(counter.load(), 10000000);
+	EXPECT_EQ(numSucceeded.load(), 10000000);
 	EXPECT_EQ(numInterrupted.load(), 0);
-	EXPECT_EQ(numFinished.load(), 100000);
+	EXPECT_EQ(numFinished.load(), 10000000);
 }
 
