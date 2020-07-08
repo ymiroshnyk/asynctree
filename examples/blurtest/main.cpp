@@ -124,11 +124,9 @@ void MainWindow::blurRect(ast::EnumTaskWeight weight, uint depthLeft, QRect rect
 				}
 			}
 		})
-		.finished([this]() {
-			ast::qt::contextCall(this, [this] { 
-				update(); 
-			});
-		})
+		.finished(ast::qt::contextFunc(this, [this]() {
+			update(); 
+		}))
 		.start();
 	}
 	else
