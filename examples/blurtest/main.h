@@ -35,15 +35,12 @@ class MainWindow : public QWidget
 	QImage source_;
 	QImage target_;
 
-	std::atomic_bool needsUpdate_;
-
 public:
 	MainWindow(QWidget *parent = 0);
 	~MainWindow();
 
 	void mouseReleaseEvent(QMouseEvent* evt) override;
 	void paintEvent(QPaintEvent* evt) override;
-	void timerEvent(QTimerEvent* evt) override;
 
 private:
 	void initTarget();

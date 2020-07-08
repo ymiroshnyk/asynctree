@@ -143,7 +143,7 @@ template <typename TFunc>
 Task& Task::_callback(std::unique_ptr<DynamicCallback>& callback, TFunc func)
 {
 	if (callback)
-		callback = makeDynamicCallback([_next{ std::move(func) }, _prev{ std::move(callback) }]{
+		callback = makeDynamicCallback([_next{ std::move(func) }, _prev{ std::move(callback) }] () mutable {
 			_prev->exec();
 			_next();
 		});
