@@ -75,7 +75,7 @@ TEST_F(AsyncTreeFunctional, OnInterruptTask)
 	).start();
 
 	onSucceededFuture.wait();
-	task->interrupt();
+	task->interruptDownwards();
 	onInterrupted.set_value(true);
 
 	service_->waitUtilEverythingIsDone();
@@ -112,7 +112,7 @@ TEST_F(AsyncTreeFunctional, OnInterruptParentTask)
 	.start();
 
 	onSucceededFuture.wait();
-	task->interrupt();
+	task->interruptDownwards();
 	onInterrupted.set_value(true);
 
 	service_->waitUtilEverythingIsDone();
@@ -125,48 +125,57 @@ TEST_F(AsyncTreeFunctional, OnInterruptParentTask)
 
 TEST_F(AsyncTreeFunctional, OnInterruptChildTask)
 {
-	int childSucceeded = 0;
-	int childFinished = 0;
-	int childInterrupted = 0;
-	bool isInterruptedInsideTheTask = false;
-	int parentSucceeded = 0;
-	int parentFinished = 0;
-	int parentInterrupted = 0;
+	enum class Type { Downwards, Upwards };
 
-	std::promise<bool> onSucceeded;
-	auto onSucceededFuture = onSucceeded.get_future();
-	std::promise<bool> onInterrupted;
-	auto onInterruptedFuture = onInterrupted.get_future();
+	for (Type type : {Type::Downwards, Type::Upwards})
+	{
+		int childSucceeded = 0;
+		int childFinished = 0;
+		int childInterrupted = 0;
+		bool isInterruptedInsideTheTask = false;
+		int parentSucceeded = 0;
+		int parentFinished = 0;
+		int parentInterrupted = 0;
 
-	auto task = service_->task(ast::Light, [&]() {
-		auto childTask = service_->task(ast::Light, [&]() {
-			onSucceeded.set_value(true);
-			onInterruptedFuture.wait();
-			isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
-		},
-		ast::succeeded([&]() { ++childSucceeded; }),
-		ast::finished([&]() { ++childFinished; }),
-		ast::interrupted([&]() { ++childInterrupted; })
+		std::promise<bool> onSucceeded;
+		auto onSucceededFuture = onSucceeded.get_future();
+		std::promise<bool> onInterrupted;
+		auto onInterruptedFuture = onInterrupted.get_future();
+
+		auto task = service_->task(ast::Light, [&]() {
+			auto childTask = service_->task(ast::Light, [&]() {
+				onSucceeded.set_value(true);
+				onInterruptedFuture.wait();
+				isInterruptedInsideTheTask = ast::Service::currentTask()->isInterrupted();
+			},
+			ast::succeeded([&]() { ++childSucceeded; }),
+			ast::finished([&]() { ++childFinished; }),
+			ast::interrupted([&]() { ++childInterrupted; })
+			).start();
+
+			onSucceededFuture.wait();
+			if (type == Type::Downwards)
+				childTask->interruptDownwards();
+			else if (type == Type::Upwards)
+				childTask->interruptUpwards();
+
+			onInterrupted.set_value(true);
+		}
+		, ast::succeeded([&]() { ++parentSucceeded; })
+		, ast::finished([&]() { ++parentFinished;  })
+		, ast::interrupted([&]() { ++parentInterrupted;  })
 		).start();
 
-		onSucceededFuture.wait();
-		childTask->interrupt();
-		onInterrupted.set_value(true);
+		service_->waitUtilEverythingIsDone();
+		EXPECT_EQ(childSucceeded, 0);
+		EXPECT_EQ(childFinished, 1);
+		EXPECT_EQ(childInterrupted, 1);
+		EXPECT_EQ(parentSucceeded, type == Type::Downwards ? 1 : 0);
+		EXPECT_EQ(parentFinished, 1);
+		EXPECT_EQ(parentInterrupted, type == Type::Downwards ? 0 : 1);
+		EXPECT_EQ(task->isInterrupted(), type == Type::Downwards ? false : true);
+		EXPECT_EQ(isInterruptedInsideTheTask, true);
 	}
-	, ast::succeeded([&]() { ++parentSucceeded; })
-	, ast::finished([&]() { ++parentFinished;  })
-	, ast::interrupted([&]() { ++parentInterrupted;  })
-	).start();
-
-	service_->waitUtilEverythingIsDone();
-	EXPECT_EQ(childSucceeded, 0);
-	EXPECT_EQ(childFinished, 1);
-	EXPECT_EQ(childInterrupted, 1);
-	EXPECT_EQ(parentSucceeded, 1);
-	EXPECT_EQ(parentFinished, 1);
-	EXPECT_EQ(parentInterrupted, 0);
-	EXPECT_EQ(task->isInterrupted(), false);
-	EXPECT_EQ(isInterruptedInsideTheTask, true);
 }
 
 TEST_F(AsyncTreeFunctional, StartTaskFromCallback)

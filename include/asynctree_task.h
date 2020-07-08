@@ -68,7 +68,8 @@ public:
 
 	void start();
 
-	void interrupt();
+	void interruptDownwards();
+	void interruptUpwards();
 	bool isInterrupted() const;
 
 private:
@@ -108,7 +109,8 @@ public:
 	template <typename TFunc>
 	Task& finished(TFunc func);
 	
-	void interrupt();
+	void interruptDownwards();
+	void interruptUpwards();
 	bool isInterrupted() const;
 
 protected:

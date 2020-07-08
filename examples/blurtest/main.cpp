@@ -42,7 +42,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
 	if (auto workP = work_.lock())
-		workP->interrupt();
+		workP->interruptDownwards();
 
 	service.waitUtilEverythingIsDone();
 }
@@ -74,7 +74,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
 	else if (state_ == S_InWork)
 	{
 		if (auto workP = work_.lock())
-			workP->interrupt();
+			workP->interruptDownwards();
 	}
 	else if (state_ == S_After)
 	{

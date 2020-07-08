@@ -100,9 +100,17 @@ void TaskImpl::start()
 	}
 }
 
-void TaskImpl::interrupt()
+void TaskImpl::interruptDownwards()
 {
 	interrupted_ = true;
+}
+
+void TaskImpl::interruptUpwards()
+{
+	interrupted_ = true;
+
+	if (parent_)
+		parent_->interruptUpwards();
 }
 
 bool TaskImpl::isInterrupted() const
@@ -279,9 +287,14 @@ TaskP Task::start()
 	return shared_from_this();
 }
 
-void Task::interrupt()
+void Task::interruptDownwards()
 {
-	impl_.interrupt();
+	impl_.interruptDownwards();
+}
+
+void Task::interruptUpwards()
+{
+	impl_.interruptUpwards();
 }
 
 bool Task::isInterrupted() const
