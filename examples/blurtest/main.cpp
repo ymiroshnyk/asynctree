@@ -45,8 +45,6 @@ MainWindow::~MainWindow()
 		workP->interrupt();
 
 	service.waitUtilEverythingIsDone();
-
-	int i = 0;
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent* evt)
