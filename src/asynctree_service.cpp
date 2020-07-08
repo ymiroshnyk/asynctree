@@ -37,7 +37,9 @@ Service::Service(const uint numThreads)
 
 Service::~Service()
 {
+	std::unique_lock<std::mutex> lock(mutex_);
 	shuttingDown_ = true;
+	lock.unlock();
 
 	workersCV_.notify_all();
 	for (auto& worker : workers_)
